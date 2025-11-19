@@ -1,0 +1,389 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2026_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{amsmath,amssymb,amsfonts,mathtools}
+\usepackage{bbm}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+%Additional packages
+\usepackage{dsfont}
+\usepackage{amsthm}
+\usepackage{booktabs}
+
+%Customized math env
+\theoremstyle{plain} % italic body; good for theorems/lemmas
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma} % share counter with theorem
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition} % upright text; good for defs/assumptions
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark} % upright, non-italic
+\newtheorem{remark}[theorem]{Remark}
+%shortcut operations
+%\newcommand{\E}{\mathbb{E}}                % Expectation
+%\newcommand{\EE}[1]{\mathbb{E}\left[#1\right]} % Convenience for \E[...]
+%\newcommand{\Var}{\mathrm{Var}}            % Variance
+%\newcommand{\Cov}{\mathrm{Cov}}            % Covariance
+%\newcommand{\Prob}{\mathbb{P}}             % Probability
+%\newcommand{\1}{\mathds{1}}                % Indicator function
+%\DeclareMathOperator*{\argmax}{arg\,max}
+%\DeclareMathOperator*{\argmin}{arg\,min}
+
+
+
+
+\title{Robust estimation of long-term Heterogeneous treatment effects via data combination}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+    Estimation of heterogeneous Long-term effect is crucial for many decision making such as personalized medicine. The major challenge of long-term effects is that the standard randomized experiment (RCTs) cannot achieve immediate results. The standard approach is to combine an observational (possibly confounded) dataset with recorded long-term outcome $Y$ with the experimental data (unconfounded but no $Y$). Yet most existing approaches target the average treatment effects (ATE), ignoring the heterogeneity which is crucial for generalization to new target groups. In this research, we develop a general overlap-weighted orthogonal meta-learner that is robust to long-tail overlap. Specifically, a special case of our method is the R-learner for long-term effects. 
+\end{abstract}
+
+
+\author{Haorui Ma}
+\date{2025.11.13}
+
+\section{Problem setting}
+We observe $(X,A\cdot(1-R),S,R,R\cdot Y)$. The experimental sample $(R=0)$ and contains $(X,A,S)$ (i.e. no observed outcome); the observational sample $(R=1)$ contains $(X,S,Y)$ (but no treatment). We assume the standard surrogacy setting as in \citet{Chen.2023} and \citet{Athey.2019}.
+
+Define
+\begin{align}
+&\pi(s,x)=\Pr(A=1\mid S = s,X = x,R = 0),\qquad
+\pi(x)=\Pr(A=1\mid X = x,R = 0),\\
+&\rho(s,x)=\Pr(R=1\mid S = s,X = x),\qquad
+\rho(x)=\Pr(R=1\mid X = x),\\
+&h(s,x)=\mathbb E[Y\mid S = s,X = x,R = 1],\qquad
+\mu(a,x)=\mathbb E \big[h(S,X)\mid A = a,X = x,R = 0\big]
+\end{align}
+
+
+Our estimand is:
+\begin{equation}
+    \tau^0(x)=\mathbb{E}[Y^1-Y^0|X=x,R=0]=\mu(1,x)-\mu(0,x)\quad\text{(experimental CATE)}.
+\end{equation}
+
+We take overlap weights $\lambda(\pi(x))$ and want to create the overlap-weighted orthogonal loss as in the weighted orthogonal learner framework of \citet{Morzywolek.2025}. Namely, our goal is to create the orthogonalized version of:
+\begin{equation}
+\label{eq:\lambda-mse-L0}
+\mathcal{L}^0(g)=\mathbb{E}\bigl[\lambda(\pi(X))\cdot(\tau^0(X)-g(X))^2 \mid R = 0\bigr]
+\end{equation}
+To do this, we start by deriving the EIF for the $\lambda$-weighted \textbf{Average} treatment effect as below:
+
+
+\section{Related work}
+\begin{table}[t]
+\centering
+\scriptsize
+\begin{tabular}{llllll}
+\toprule
+Paper & Data / A-in-O & Estimand & Confounding (O) & Treat. type & Overlap \\
+\midrule
+\citet{Athey.2016} & E+O, A$\notin$O & long-term ATE & none (surrogacy+comparability) & bin & No \\
+\citet{Athey.2019} & E+O, A$\notin$O & long-term ATE & none (surrogacy+comparability) & bin & No \\
+\citet{Chen.2023} & E+O, both cases & long-term ATE & none (latent unconf./surrogacy) & bin & No \\
+Yang.2024 & E+O, A$\notin$O & Policy (long-term) & none (surrogacy index) & bin / multi & No \\
+\midrule
+Imbens.2025 & E+O, A$\in$O & long-term ATE & latent (persistent confounding) & bin & No \\
+Ghassami.2025 & E+O, A$\in$O & long-term ATE & latent (equi / BSIV / proximal) & bin & No \\
+Goffrier.2023 & E+O, A$\in$O & long-term ATE & latent (IV / front-door) & bin / cont & No \\
+\midrule
+Yang.2025 & E+O, A$\in$O & HTE (HDRC) & latent (OT weighting) & cont dose &No \\
+Cai.2025 & E+O, A$\in$O & HTE (ICE) & latent (rep.~learning) & bin & No \\
+Chen.2025 & E+O, A$\in$O & HTE (HLCE) & latent (multi-robust, equi-conf.) & bin & No \\
+Singh.2025 & 1-sample & long-term dose response & none (unconf.) & cont dose & No \\
+\midrule
+Tran.2024 & 1-sample (exp) & long-term ATE & n/a (exp., RL) & long-term path & No \\
+Yang.2024 & E+O, A$\notin$O & Policy  & none (surrogacy) & bin / multi & No \\
+ours & E+O, A$\notin$O & HTE & none (surrogacy+comparability) & bin & \textcolor{green}{YES} \\
+\bottomrule
+\end{tabular}
+\caption{Literature landscape}
+\end{table}
+
+
+
+
+
+\section{EIF for the Overlap-Weighted WATE $\tau_\lambda^0$}
+Define the overlap-weighted average treatment effect on the experimental dataset as:
+\begin{equation}
+    \tau_\lambda^0 \;=\; \frac{\mathbb{E}\bigl[\lambda(\pi(X))\tau^0(X) \mid R = 0 \bigr]}{\mathbb{E}\bigl[\lambda(\pi(X)) | R =0 \bigr]} \;=\;\frac{N}{D}
+\end{equation}
+
+\paragraph{EIF for the Overlap Weight $D$}
+
+The denominator is $D = \mathbb{E}[\lambda(\pi(X)) | R=0]$, where $\lambda(\pi(X)) = \pi(X)(1-\pi(X))$. And its EIF is:
+$$
+\phi_D(Z) = \frac{\mathbf{1}\{R=0\}}{p_0} \Big( \lambda(\pi(X)) - D \Big) + \frac{\mathbf{1}\{R=0\}}{p_0} \lambda'(\pi(X)) (A - \pi(X))
+$$
+
+\paragraph{EIF for the Overlap-Weighted WATE $\tau^0_\lambda = N/D$}
+
+The EIF for $\tau^0_\lambda$ is:
+
+\begin{align}
+\label{eq:eif-wate}
+\text{EIF}({\tau^0_\lambda})(Z;\eta) = \frac{1}{D p_0} \Bigg\{
+& \underbrace{ \mathbf{1}\{R=1\} \lambda(\pi(X)) \left( \frac{1-\rho(S,X)}{\rho(S,X)} \frac{\pi(S,X)-\pi(X)}{\pi(X)(1-\pi(X))} (Y-h(S,X)) \right) }_{\text{Observational Part (Corrected Transport)}} \\
+& + \underbrace{ \mathbf{1}\{R=0\} \lambda(\pi(X)) \left[ \frac{A}{\pi(X)}(h(S,X)-\mu(1,X)) - \frac{1-A}{1-\pi(X)}(h(S,X)-\mu(0,X)) \right] }_{\text{Experimental: Mean adjustment } \mu} \\
+& +  \mathbf{1}\{R=0\} \rho(A,\pi(X)) (\tau^0(X) - \tau^0_\lambda) \Bigg\},
+\end{align} 
+where $p_0=P(R=0)$, $\eta =(\pi(s,x),\pi(X),\rho(s,x),h(s,x),\mu(a,x))$ is the set of all nuisance functions and  $\tau^0(X)$ can be replaced by $\mu(1,X)-\mu(0,X)$. To shorten the terms, we use $\rho(A,\pi(X))$ (this is not the nuisance $\rho(x),\rho(s,x)$) for the representation of:
+\begin{equation}
+    \rho(A,\pi(X))\;=\;\lambda(\pi(X))+(A-\pi(X))\lambda'(\pi(X)).
+\end{equation}
+
+\textbf{Remark}: When $\lambda(\pi(X))=1$, Eq.\ref{eq:eif-wate} is just the normal ATE on the experimental dataset (see \citet{Chen.2023} Theorem B.2).
+
+
+\paragraph{The orthogonal score:}
+For simplicity, denote:
+\begin{equation}
+    \kappa(S,X) = \frac{1-\rho(S,X)}{\rho(S,X)} \frac{\pi(S,X)-\pi(X)}{\pi(X)(1-\pi(X))},
+\end{equation}
+and also the correction term on the observational set:
+\begin{equation}
+    \psi_\lambda^1(Z;\eta)=\lambda(\pi(X)) \kappa(S,X) (Y-h(S,X)).
+\end{equation}
+Denote:
+\begin{equation}
+    \Delta_h(S,X) = \frac{A}{\pi(X)}(h(S,X)-\mu(1,X)) - \frac{1-A}{1-\pi(X)}(h(S,X)-\mu(0,X))
+\end{equation}
+and also the pseudo outcome for $\tau^0_\lambda(X)$ on the experimental set:
+\begin{equation}
+    \label{eq:def-phi-lambda}
+    \phi^0_\lambda(Z)=\mu(1,X)-\mu(0,X)+\frac{\lambda(\pi(X))}{\rho(A,\pi)}\cdot \Delta_h(S,X).
+\end{equation}
+Then the plug-in score looks like:
+\begin{equation}
+\label{eq:plug-in-score}
+    S_\lambda(g) = \frac{1}{D\cdot p_0}\mathbb{E}\Big[\mathbf{1}\{R=0\}\rho(A,\pi)(\phi_\lambda^0(Z)-g(X)) + \mathbf{1}\{R=1\}\psi_\lambda^1(Z)\Big]
+\end{equation}
+The score defined in Eq.\ref{eq:plug-in-score} is \textbf{Neyman Orthogonal}.
+
+\section{The weighted orthogonal loss}
+Based on the weighted orthogonal loss, the empirical risk that we can derive right away is:
+\begin{equation}
+    \label{eq:ortho-loss}
+    \mathcal{L}_\lambda(g; \eta) \;=\;\frac{1}{D\cdot p_0}\mathbb{E}\Big[\underbrace{\mathbf{1}\{R=0\}\rho(A,\pi)(\phi_\lambda^0(Z)-g(X))^2}_{\text{Normal POR on R=0}} - \underbrace{2\cdot\mathbf{1}\{R=1\}\;\psi_\lambda^1(Z) \cdot g(X)}_{\text{Correction from R=1}}\Big]
+\end{equation}
+
+\begin{lemma}
+\label{lemma:equiv-orthogonal-loss}
+    The population risk $\mathcal{L}_\lambda(g, \eta_0)$ is equivalent with the oracle population risk, defined as:
+    \begin{equation}
+    \label{eq:oracle-weighted-loss}
+        \mathcal{R}_\lambda(g) = \E\bigl[\lambda(\pi(X))\cdot(\tau^0(X)-g(X))^2 \mid R=0\bigr].
+    \end{equation}
+    Here, equivalence means, for a given functional space $\mathcal{G}$,we have
+    \begin{equation}
+        g^* = \argmin_{g\in \mathcal{G}} \mathcal{L}_\lambda(g, \eta_0) = \argmin_{g\in \mathcal{G}} \mathcal{R}_\lambda(g).
+    \end{equation}
+    Furthermore, if $\tau^0(\cdot) \in \mathcal{G}$, then the minimizer $g^*$ of our proposed weighted orthogonal loss recovers the true CATE. 
+\end{lemma}
+\begin{proof}
+    See Appendix~\ref{app:proofs} for detailed proof.
+\end{proof}
+
+
+
+However, the problem is that the loss in Eq.\ref{eq:ortho-loss} have a \textbf{target mismatch} for $g$ in $R=0$ and $R=1$ subpopuplation. This is unfavorable to the application of non-parametric models such as neural networks under a finite sample setting, where have an empirical mean of the $\mathcal{L}(g)$:
+\begin{equation}
+    \label{eq:ortho-loss}
+    \mathcal{L}_n(g) \;=\;\frac{1}{\hat{D}\cdot p_0}\sum_{i=1}^n\Big[\underbrace{\mathbf{1}\{R_i=0\}\rho(A_i,\pi)(\phi_\lambda^0(Z_i)-g(X_i))^2}_{\text{target is valid pseudo outcome}} - \underbrace{2\cdot\mathbf{1}\{R_i=1\}\;\psi_\lambda^1(Z_i) \cdot g(Xi)}_{\textcolor{red}{\text{target is \textbf{???}}}}\Big].
+\end{equation}
+
+Hence we need to improve this current loss $\mathcal{L}(g)$.
+
+The first idea is that we do a targeted learning on $h(S,X)$ s.t. the residual term $\psi_\lambda^1(Z) \cdot g(X)$ is negligible (Inspiration from \citet{Vansteelandt.2023}). Then we can fully concentrate on learning the $g$ via:
+\begin{equation}
+    \label{eq:targeted-loss}
+    \mathcal{L}(g) \;=\;\frac{1}{D\cdot p_0}\mathbb{E}\Big[\underbrace{\mathbf{1}\{R=0\}\rho(A,\pi)(\widetilde{\phi}_\lambda^0(Z)-g(X))^2}_{\text{Normal POR on R=0 after re-targeting $h(\cdot,\cdot)$}} \Big]
+\end{equation}
+Here $\widetilde{\phi}^0_\lambda(Z)$'s $h(S,X)$ is replaced by the targeted $\widetilde{h}(S,X)$:
+\begin{equation}
+    \widetilde{\phi}^0_\lambda(Z)=\mu(1,X)-\mu(0,X)+\frac{\lambda(\pi(X))}{\rho(A,\pi)}\cdot \frac{A-\pi(X)}{\pi(X)(1-\pi(X))}(Y - \textcolor{red}{\widetilde{h}(S,X)}).
+\end{equation}.
+
+
+\section{Objective re-targeting (Study note)}
+In this section, we briefly summarize how does \citet{Vansteelandt.2023} use re-targeting to vanish term (8) in their orthogonal loss. The orthogonal loss, as the paper points out, is not suitable for normal non-parametric learning due to the existence of term (8):
+\begin{equation}
+\frac{1}{n}\sum_{i=1}^{n}\{A_{i}Y_{i}+(1-A_{i})\hat{Q}(L_{i})-m(Z_{i})\}^{2}-\underbrace{A_{i}\frac{1-\hat{g}(L_{i})}{\hat{g}(L_{i})}\{Y_{i}-\hat{Q}(L_{i})\}2m(Z_{i})}_{\text{Term (8)}}
+\tag{7}
+\end{equation}
+
+\paragraph{Motivation: The Original Magnitude of Term (8)}
+
+The core of the paper's logic is to make the simple, non-orthogonal imputation loss (5) behave like the complex, orthogonal loss (7) (See \citet{Vansteelandt.2023}. The only difference between them is Term (8):
+$$
+\text{Term (8)} = \frac{1}{n}\sum_{i=1}^{n}A_{i}\frac{1-\hat{\pi}(X_{i})}{\hat{\pi}(X_{i})}\{Y_{i}-\hat{Q}(X_{i})\}\;m(Z_{i})
+$$
+The motivation for targeting is that this term is not asymptotically negligible. When using flexible machine learning to estimate the nuisance parameter $\hat{Q}(X_i)$, the residuals $\{Y_i - \hat{Q}(X_i)\}$ converge slowly.
+
+As a result, Term (8) converges at a slow "product" rate, e.g., $O_p(n^{-b})$ for $b < 1/2$ (See original paper). This slow convergence would dominate the error and propagate bias from the nuisance parameter $\hat{Q}$ into the final estimator $\hat{m}(Z)$. The goal of re-targeting is to shrink this term to a much faster rate (e.g., $O_p(n^{-2/3})$), making it asymptotically negligible.
+
+\paragraph{Additional Assumptions for $m(\cdot)$ (predictor)}
+
+Targeting Term (8) directly is impossible because $m(Z)$ is the very function we are trying to find.
+\newline
+\newline
+To overcome this, the paper makes a smoothness and sparsity assumption on $m(Z)$. It assumes $m(Z)$ can be well-approximated by a finite linear combination of $J_n$ known (orthonormal) basis functions $\{b_j(Z)\}_{j=1}^{J_n}$
+$$
+m(Z_i) \approx \sum_{j=1}^{J_n} \gamma_j b_j(Z_i)
+$$
+Now instead of shrinking Term (8) for an unknown function $m(Z)$, we can shrink it for every known basis function $b_j(Z)$. 
+
+\paragraph{Regularized Regression for $\epsilon$}
+
+The targeting is performed by fitting a \textbf{parametric submodel} to update the initial estimate $\hat{Q}^{(0)}$ to a new, targeted $\widetilde{Q}$. We assume identity link function ($h(x)=x$), then this submodel is:
+$$
+\widetilde{Q}_\epsilon(X_i) = \hat{Q}^{(0)}(X_i) + \sum_{j=1}^{J_n} \epsilon_j \underbrace{\left( b_j(Z_i) \frac{1-\hat{\pi}(X_i)}{\hat{\pi}(X_i)} \right)}_{\text{Covariate } C_{ij}}
+$$
+The vector $\epsilon = [\epsilon_1, \dots, \epsilon_{J_n}]^T$ is found by solving an $L_1$-penalized (Lasso) least-squares regression. This regression is fit only on the treated subjects ($A_i=1$, let $N = n_{A=1}$).
+\newline
+The optimization objective is to find $\epsilon^* = \arg\min_{\epsilon} \mathcal{L}(\epsilon)$:
+$$
+\mathcal{L}(\epsilon) = \underbrace{ \frac{1}{n} \sum_{i: A_i=1} \left( \underbrace{(Y_i - \hat{Q}^{(0)}(X_i))}_{\text{Outcome}} - \sum_{j=1}^{J_n} \epsilon_j C_{ij} \right)^2 }_{\text{L2 Loss } L_2(\epsilon)} + \underbrace{ \lambda ||\epsilon||_1 }_{\text{Penalty}}
+$$
+where $\lambda$ is the penalty parameter, set to $O_p(\sqrt{\log(J_n)/n})$. (So the penalty parameter depends on the sample size).
+
+\paragraph{Analysis and Shrinkage}
+
+The solution $\epsilon^*$ is the vector that minimizes $\mathcal{L}(\epsilon)$. By the KKT conditions, the optimal solution $\epsilon^*$ (and its Lagrange multiplier $\mu^*$ (which is just $\lambda$)) must satisfy the KKT condition.
+\newline
+\newline
+For a convex problem with a non-differentiable $l_1$-norm, the zero vector must be in the subgradient of the Lagrangian at the optimal point. This implies a specific bound on the gradient of the unpenalized loss $L_2(\epsilon)$ at the solution $\epsilon^*$:
+$$
+\left| \frac{\partial L_2(\epsilon^*)}{\partial \epsilon_k} \right| \le \mu^*=\lambda \quad  \quad \text{for all } k = 1, \dots, J_n
+$$
+Now compute this gradient:
+$$
+\frac{\partial L_2(\epsilon^*)}{\partial \epsilon_k} = \frac{-2}{N} \sum_{i: A_i=1} \underbrace{\left( (Y_i - \hat{Q}^{(0)}(X_i)) - \sum_{j=1}^{J_n} \epsilon_j^* C_{ij} \right)}_{\text{This is } (Y_i - \widetilde{Q}(X_i))} \cdot C_{ik}
+$$
+Substituting $\widetilde{Q}$ and $X_{ik}$, the KKT condition requires that the solution $\epsilon^*$ satisfies:
+$$
+\left| \frac{-2}{N} \sum_{i: A_i=1} \left( Y_i - \widetilde{Q}(X_i) \right) \cdot \left( b_k(Z_i) \frac{1-\hat{\pi}(X_i)}{\hat{\pi}(X_i)} \right) \right| \le \lambda
+$$
+This is the mathematical guarantee. The Lasso fit forces the (weighted) correlation between the new residuals $(Y_i - \widetilde{Q}(X_i))$ and every basis function $b_k(Z_i)$ to be smaller than the penalty $\lambda$.
+\newline
+Now, let's look at Term (8) using $\widetilde{Q}$ and the $m(Z)$ approximation:
+$$
+\text{Term (8) with } \widetilde{Q} = \frac{1}{n}\sum_{i: A_i=1} \{Y_{i}-\widetilde{Q}(X_{i})\} \frac{1-\hat{\pi}(X_{i})}{\hat{\pi}(X_{i})} m(Z_{i})
+$$
+$$
+\approx \frac{1}{n}\sum_{i: A_i=1} \{Y_{i}-\widetilde{Q}(X_{i})\} \frac{1-\hat{\pi}(X_{i})}{\hat{\pi}(X_{i})} \left( \sum_{k=1}^{J_n} \gamma_k b_k(Z_i) \right)
+$$
+Rearranging the sum:
+$$
+\approx \sum_{k=1}^{J_n} \gamma_k \underbrace{ \left[ \frac{1}{n} \sum_{i: A_i=1} \{Y_{i}-\widetilde{Q}(X_{i})\} \left( b_k(Z_i) \frac{1-\hat{\pi}(X_i)}{\hat{\pi}(X_i)} \right) \right] }_{\text{Term bounded by KKT}} \leq \lambda \cdot (N/2n) = O_p(\sqrt{\log(J_n)/n})
+$$
+The term in the brackets is exactly the (scaled) gradient from the KKT condition, which is bounded by $\lambda \cdot (N/2n)$. Since $\lambda$ is small ($O_p(\sqrt{\log(J_n)/n})$), each component of the sum is "shrunk." Term (8) is now a linear combination of terms that have all been forced to be near zero, ensuring the entire term is asymptotically \textbf{negligible}.
+
+
+
+\bibliography{iclr2026_conference}
+\bibliographystyle{iclr2026_conference}
+
+\appendix
+\section{Appendix}
+\section{Proofs}
+\label{app:proofs}
+\begin{proof}[Proof of Lemma~\ref{lemma:equiv-orthogonal-loss}]
+Let the nuisance functions be correctly specified:
+\[
+\pi(s,x)=\Pr(A=1\mid S=s,X=x,R=0),\quad
+\pi(x)=\Pr(A=1\mid X=x,R=0),
+\]
+\[
+\rho(s,x)=\Pr(R=1\mid S=s,X=x),\quad
+h(s,x)=\E[Y\mid S=s,X=x,R=1],
+\]
+\[
+\mu(a,x)=\E\big[h(S,X)\mid A=a,X=x,R=0\big],\qquad
+\tau^0(x)=\mu(1,x)-\mu(0,x),
+\]
+Hence, throughout the proof we simplify the notations: $\eta=\eta_0=(\pi_0(s,x),\pi_0(X),\rho_0(s,x),h_0(s,x),\mu_0(a,x))$. 
+
+We show that, at the true nuisances, we have:
+\begin{equation}
+    \label{eq:lemma-L-R-equiv}
+    \mathcal{L}_\lambda(g;\eta_0) = \frac{1}{D}\mathcal{R}_\lambda(g) + \text{C}(\eta_0)
+\end{equation}
+And since the second term $\text{C}(\eta_0)$ does not depend on $g$, we can reach the conclusion that the two losses are equivalent, if we are able to prove Eq.\ref{eq:lemma-L-R-equiv}.
+
+We start by looking into $\mathcal{L}_\lambda(g)$:
+\[
+\mathcal{L}(g)=\frac{1}{Dp_0}\,
+\E\left[\underbrace{\1\{R=0\}\,\rho(A,\pi)\big\{\phi^0_\lambda(Z)-g(X)\big\}^2}_{\text{part \textbf{A}}}
+\;-\; \underbrace{2\,\1\{R=1\}\,\psi^1_\lambda(Z)\,g(X)}_{\text{part \textbf{B}}}\right].
+\]
+In part A, write
+\[
+\phi^0_\lambda(Z)-g(X)
+=\big(\phi^0_\lambda(Z)-\tau^0(X)\big)+\big(\tau^0(X)-g(X)\big).
+\]
+Then
+\begin{align}
+\text{part \textbf{A}} & \quad =\E\left[\1\{R=0\}\,\rho(A,\pi)\big\{\phi^0_\lambda(Z)-g(X)\big\}^2\right]\\
+&\quad=\underbrace{\E\left[\1\{R=0\}\,\rho(A,\pi)\{\tau^0(X)-g(X)\}^2\right]}_{\text{A(1)}}  + \underbrace{\E\left[\1\{R=0\}\,\rho(A,\pi)\,U(Z)^2\right]}_{\text{A(2)}} \\
+&\qquad +2\underbrace{\,\E\left[\1\{R=0\}\,\rho(A,\pi)\{\tau^0(X)-g(X)\}\big(\phi^0_\lambda(Z)-\tau^0(X)\big)\right]}_{\text{A(3)}}.
+\end{align}
+
+Since $\{\tau^0(X)-g(X)\}^2$ depends only on $X$, and notice that $\E[\rho(A,\pi)\mid X,R=0]=\lambda(\pi(X))+\lambda'(\pi(X))\E[A-\pi(X)\mid X,R=0]
+=\lambda(\pi(X))$. Therefore, by tower property,
+\begin{align}
+\text{A(1)}
+& \;=\;
+\E\left[\1\{R=0\}\,\rho(A,\pi)\{\tau^0-g\}^2\right] \\
+& \;=\; \E\left[\1\{R=0\}\,\lambda(\pi(X))\{\tau^0(X)-g(X)\}^2\right] \\
+& \;=\; \E\left[\lambda(\pi(X))\{\tau^0(X)-g(X)\}^2 \mid R = 0\right] \cdot p_0 \\
+& \;=\; p_0\cdot \mathcal{R}_\lambda(g).
+\end{align}
+
+Since $\phi^0_\lambda(Z)=\tau^0(X)+\frac{\lambda(\pi(X))}{\rho(A,\pi)}\cdot \Delta_h(S,X)$, the cross term A(3) is:
+\begin{align}
+    \text{A(1)}
+& \;=\; p_0\E\left[\rho(A,\pi)\{\tau^0(X)-g(X)\}\big(\phi^0_\lambda(Z)-\tau^0(X)\big) \mid R=0\right] \\
+& \;=\; p_0\E\left[\rho(A,\pi)\{\tau^0(X)-g(X)\}\frac{\lambda(\pi)}{\rho(A,\pi)} \Delta_h(S,X) \mid R=0\right] \\
+& \;=\; p_0\E\left[\{\tau^0(X)-g(X)\}\lambda(\pi)\Delta_h(S,X) \mid R=0\right].
+\end{align}
+Notice that $\Delta_h(S,X)=\frac{A-\pi}{\pi(1-\pi)}\bigl(h(S,X)-\mu(A,X)\bigr)$, then:
+\begin{align}
+    E_1(X) &= \E\left[\Delta_h(S,X)\mid A=1,X,R=0\right]=\E\left[\frac{1}{\pi(X)}\bigl(h(S,X)-\mu(1,X)\bigr) \mid A=1,X,R=0\right] = 0 \\
+    E_2(X) &=\E\left[\Delta_h(S,X)\mid A=0,X,R=0\right] = \E\left[\frac{1}{1-\pi(X)}\bigl(h(S,X)-\mu(0,X)\bigr) \mid A=0,X,R=0\right] = 0
+\end{align}
+, then by tower property
+\begin{equation}
+    \text{A(3)}\;=\; p_0\E\left[(\tau^0(X)-g(X))\lambda(\pi) \left[\pi(X)E_1-(1-\pi(X))E_2\right] \mid R=0\right] = 0.
+\end{equation}
+Let A(2) be $\text{C}(\eta_0)$ as it does not depend on $g(x)$. Summing A(1), A(2) and A(3) together, we have:
+\begin{equation}
+\label{eq:part-A}
+    \text{part \textbf{A} } = p_0\cdot \mathcal{R}_\lambda(g) + \text{C}(\eta_0).
+\end{equation}
+
+In part \textbf{B}, We have
+\begin{equation}
+\label{eq:part-B}
+\E\left[\1\{R=1\}\,\psi_\lambda^1(Z)\,g(X)\right]
+=\E\!\left[\1\{R=1\}\,\lambda(\pi(X))\,\kappa(S,X)\,\{Y-h(S,X)\}\,g(X)\right]=0,
+\end{equation}
+because $\E[Y-h(S,X)\mid S,X,R=1]=0$ and $g(X),\lambda(\pi(X)),\kappa(S,X)$ are measurable w.r.t.\ $(S,X)$. Using tower property to marginalize the expectation over $(S,X)$, the inner conditional mean in $Y$ remains
+zero, and hence the whole part B turns into zero.
+
+Taking the sum of part A and part B, we achieve our goal in Eq.\ref{eq:lemma-L-R-equiv}. 
+\end{proof}
+
+\end{document}

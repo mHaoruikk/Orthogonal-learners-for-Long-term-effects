@@ -1,0 +1,6 @@
+defaults:
+ - dataset: setupA
+ - model: overlap_orth
+ - trainer: default
+
+seed: 2025

@@ -29,6 +29,7 @@
 \theoremstyle{remark} % upright, non-italic
 \newtheorem{remark}[theorem]{Remark}
 %shortcut operations
+\newcommand{\indep}{\mathrel{\perp\mspace{-10mu}\perp}} % independence
 %\newcommand{\E}{\mathbb{E}}                % Expectation
 %\newcommand{\EE}[1]{\mathbb{E}\left[#1\right]} % Convenience for \E[...]
 %\newcommand{\Var}{\mathrm{Var}}            % Variance
@@ -75,7 +76,7 @@ Our estimand is:
 
 We take overlap weights $\lambda(\pi(x))$ and want to create the overlap-weighted orthogonal loss as in the weighted orthogonal learner framework of \citet{Morzywolek.2025}. Namely, our goal is to create the orthogonalized version of:
 \begin{equation}
-\label{eq:\lambda-mse-L0}
+\label{eq:lambda-mse-L0}
 \mathcal{L}^0(g)=\mathbb{E}\bigl[\lambda(\pi(X))\cdot(\tau^0(X)-g(X))^2 \mid R = 0\bigr]
 \end{equation}
 To do this, we start by deriving the EIF for the $\lambda$-weighted \textbf{Average} treatment effect as below:
@@ -215,6 +216,97 @@ Here $\widetilde{\phi}^0_\lambda(Z)$'s $h(S,X)$ is replaced by the targeted $\wi
 \begin{equation}
     \widetilde{\phi}^0_\lambda(Z)=\mu(1,X)-\mu(0,X)+\frac{\lambda(\pi(X))}{\rho(A,\pi)}\cdot \frac{A-\pi(X)}{\pi(X)(1-\pi(X))}(Y - \textcolor{red}{\widetilde{h}(S,X)}).
 \end{equation}.
+
+\section{Experiment}
+\paragraph{Goal of experiment}
+Given the mixed experimental ($E=(X,A,S)$) and observational dataset $O=(X,S,Y)$, does our proposed weighted R-learner accurately predict the true CATE?
+
+\textbf{RQ1:} When overlap is poor, is our method better than the unweighted R-learner under finite sample?\\
+\textbf{RQ2:} How does our method compares to the naive plug-in methods (T-learner, S-learner)? \\
+\textbf{RQ3 (optional):} How does the re-targeted version compare with the normal one?
+
+\subsection{Dataset}
+
+\subsubsection{Simulation}
+We start with the fully synthetic dataset. Here, we take inspirations from \citet{Nie.2021}, but we extend it to a two-dataset setting: The generic simulation steps are:
+\begin{enumerate}
+    \item Pre-treatment covariates: On the observational dataset $X\sim P_d^O$, where $P_d$ is the pre-defined $d$-dimensional joint distribution of the covariates. Analogously, $X \sim P_d^E$ on the experimental dataset.
+    \item Treatment in $E$: $A\mid X \sim \text{Ber}(\pi^*(X))$. Here $\pi^*$ is the true treatment propensity score.
+    \item Implicit treatment in Observational data: $A\mid X \sim \text{Ber}(e^*(X))$. Here $e^*$ is some implicit treatment propensity score that we do not know.
+    \item Short-term outcome: $S =  a^*(X) + (A-0.5)\tau^*_S(X) + \delta$. $\delta \mid X \sim \mathcal{N}(0, \sigma_S)$. Here, $\delta$ is independent with all the variables except for X.
+    \item Long-term outcome in $O$: $Y = b^*(X,S) + (A - 0.5)\tau^*_Y(X) + \epsilon$. Here $\epsilon$ is exogeneous noise variable $\epsilon \sim \mathcal{N}(0, \sigma_Y)$. Under our surrogacy assumption ($A \indep Y \mid S, X$ ), $\tau_Y^* = 0$.Then:
+    \begin{equation}
+        Y = b^*(S,X) + \epsilon.
+    \end{equation}
+\end{enumerate}
+\textbf{Note:} The true heterogeneous effect of $A$ on the long-term outcome $Y$ is not $\tau_Y^*(X)$, but:
+\begin{equation}
+\label{eq:true-cate-simulation}
+    \tau(X)=\E \left[Y^1-Y^0\mid X\right] = \E\left[b(X,S^1) - b(X, S^0) \mid X \right] + \tau_Y^*(X).
+\end{equation}
+Under the surrogacy assumption, the effect of the treatment $A$ is fully mediated by the surrrogate variable $S$, which means $\tau_Y^*=0$, and hence:
+\begin{equation}
+\label{eq:true-cate-surr-simulation}
+    \tau(X)=\E \left[Y^1-Y^0\mid X\right] = \E\left[b(X,S^1) - b(X, S^0)\mid X \right].
+\end{equation}
+
+\paragraph{Setup A: complex $\pi$}
+We now instantiate the above generic framework in analogy with Setup~A of \citet{Nie.2021} (with surrogacy)
+
+Let $X \sim \mathrm{Unif}([0,1]^{10})$, and define the treatment propensity on the experiment dataset to be:
+\begin{equation}
+    \pi^*(X)
+    = \mathrm{trim}_{0.1}\!\big(\sin(\pi X_1 X_2)\big),
+    \qquad
+    \mathrm{trim}_{\eta}(u)
+    := \max\{\eta,\min(u,1-\eta)\}.
+\end{equation}
+For the observational dataset $O$, define the implicit treatment propensity to be:
+\begin{equation}
+    \pi^*(X)
+    = \mathrm{trim}_{0.1}\!\big(\frac{1}{1 + e^{X_2 + X_3}}\big),.
+\end{equation}
+For short-term outcome $S$, We re-use the main effect from the original Setup~A \cite{Nie.2021}:
+\begin{equation}
+    a^*(X)
+    = \sin(\pi X_1 X_2)
+      + 2(X_3 - 0.5)^2
+      + X_4 + 0.5 X_5 + X_6.
+\end{equation}
+We set the short-term treatment effect equal to the original simple CATE:$\tau_S^*(X) = \frac{X_1 + X_2}{2}.$ Thus,
+\begin{equation}
+    S
+    = a^*(X)
+      + (A - 0.5)\,\tau_S^*(X)
+      + \delta, \text{ where } \delta\sim \mathcal{N}(0,0.2)
+\end{equation}
+
+To keep structure simple while ensuring that the long-term CATE matches the desired quantity, let:
+\begin{equation}
+    Y = b^*(X,S) + \epsilon=X_7^2 + X_8 + S,
+    \qquad
+    \epsilon \sim \mathcal{N}(0,0.5^2).
+\end{equation}
+Under this setup, the long-term CATE is:
+\begin{equation}
+\label{eq:setupA-cate}
+    \tau(X)
+    = \E[Y^1 - Y^0 \mid X]
+    = S^1 - S^0
+    = \tau_S^*(X)
+    = \frac{X_1 + X_2}{2}.
+\end{equation}
+
+\paragraph{Setup B: Normal $\pi$}
+In this setup, we consider a relatively stable treatment propensity which is easier to predict than in setup A. Specifically, we set:
+\begin{equation}
+    \pi^*(X)
+    := 0.5 \;+\; 0.25 \,\tanh\!\big(v(X)\big), \qquad v(X)= \frac{X_1 + X_2}{2}.
+\end{equation}
+Else remain the same with setup A.
+
+
+
 
 
 \section{Objective re-targeting (Study note)}

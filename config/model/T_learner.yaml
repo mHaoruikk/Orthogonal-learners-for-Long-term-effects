@@ -1,0 +1,21 @@
+# conf/model/overlap_orth.yaml
+name: t_learner
+backend: sklearn            
+lambda_type: overlap
+cate_regressor:
+  type: random_forest
+  n_estimators: 200
+  max_depth: 10
+
+nuisances:
+  treatment_propensity:  #config for estimator \pi(x)
+    type: logistic
+    penalty: 0.001
+  r_propensity: #config for \rho(x)
+    type: logistic
+  h_mean:     #config for h(S,X)
+    type: ridge
+  mu_mean: #config for \mu(a,x)
+    type: ridge 
+
+  

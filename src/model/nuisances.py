@@ -1,0 +1,166 @@
+from dataclasses import dataclass
+from typing import Optional
+import numpy as np
+
+from src.data.base_dataset import TwoSampleDataSplit
+from src.model.base_model import BaseEstimator, SklearnClassifier, XGBoostClassifier
+from src.model.utils import build_classifier, build_regressor
+
+@dataclass
+class NuisanceModels:
+    pi_x: Optional[BaseEstimator] = None
+    pi_s_x: Optional[BaseEstimator] = None
+    rho_x: Optional[BaseEstimator] = None
+    rho_s_x: Optional[BaseEstimator] = None
+    h_s_x: Optional[BaseEstimator] = None
+    mu_0: Optional[BaseEstimator] = None   
+    mu_1: Optional[BaseEstimator] = None
+
+@dataclass
+class CrossFittedNuisances:
+    """
+    Result of cross-fitting K sets of nuisances.
+
+    folds[k] contains NuisanceModels trained on fold k's *training* data.
+    fold_id_e[i] gives which fold observation i in the experimental sample belongs to.
+    fold_id_o[j] gives which fold observation j in the observational sample belongs to.
+    """
+    folds: list[NuisanceModels]
+    fold_id_e: np.ndarray  # shape (n_e,), values in {0,...,K-1}
+    fold_id_o: np.ndarray  # shape (n_o,), values in {0,...,K-1}
+
+from sklearn.model_selection import KFold
+
+class NuisanceFactory:
+    """
+    Factory that, given ModelConfig and data, fits nuisances via K-fold cross-fitting.
+
+    - For each fold k, we fit nuisances on the training portion of that fold
+      (separately for experimental and observational parts where needed).
+    - We return K sets of NuisanceModels plus fold assignments.
+    """
+
+    def __init__(self, model_cfg: ModelConfig):
+        self.model_cfg = model_cfg
+        self.K = model_cfg.num_crossfit
+
+    def _make_folds(self, n_e: int, n_o: int, random_state: int = 42) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Create K-fold assignments for E and O separately.
+        Returns:
+            fold_id_e: (n_e,) in {0,...,K-1}
+            fold_id_o: (n_o,) in {0,...,K-1}
+        """
+        kf_e = KFold(n_splits=self.K, shuffle=True, random_state=random_state)
+        kf_o = KFold(n_splits=self.K, shuffle=True, random_state=random_state)
+
+        fold_id_e = np.empty(n_e, dtype=int)
+        fold_id_o = np.empty(n_o, dtype=int)
+
+        for k, (_, val_idx) in enumerate(kf_e.split(np.arange(n_e))):
+            fold_id_e[val_idx] = k
+        for k, (_, val_idx) in enumerate(kf_o.split(np.arange(n_o))):
+            fold_id_o[val_idx] = k
+
+        return fold_id_e, fold_id_o
+
+    def fit_crossfit(self, data: TwoSampleDataSplit) -> CrossFittedNuisances:
+        X_e, A_e, S_e = data.X_e, data.A_e, data.S_e
+        X_o, S_o, Y_o = data.X_o, data.S_o, data.Y_o
+
+        n_e, n_o = X_e.shape[0], X_o.shape[0]
+        fold_id_e, fold_id_o = self._make_folds(n_e, n_o)
+
+        folds: list[NuisanceModels] = []
+
+        for k in range(self.K):
+            # Training indices for this fold
+            train_e = np.where(fold_id_e != k)[0]
+            train_o = np.where(fold_id_o != k)[0]
+
+            # Build nuisances according to config
+            nuis_cfg = self.model_cfg.nuisances
+
+            nm = NuisanceModels()
+
+            # ---- pi_x: P(A=1 | X, R=0) using experimental train data ----
+            if "pi_x" in nuis_cfg:
+                pi_x_est = build_classifier(nuis_cfg["pi_x"])
+                pi_x_est.fit(X_e[train_e], A_e[train_e])
+                nm.pi_x = pi_x_est
+
+            # ---- pi_s_x: P(A=1 | S,X,R=0) ----
+            if "pi_s_x" in nuis_cfg:
+                Z_e = np.column_stack([S_e, X_e])  # shape (n_e, 1+d)
+                pi_s_x_est = build_classifier(nuis_cfg["pi_s_x"])
+                pi_s_x_est.fit(Z_e[train_e], A_e[train_e])
+                nm.pi_s_x = pi_s_x_est
+
+            # ---- rho_x: P(R=1 | X) using combined E+O ----
+            if "rho_x" in nuis_cfg:
+                X_comb = np.vstack([X_e, X_o])
+                R_comb = np.concatenate([np.zeros(n_e, dtype=int), np.ones(n_o, dtype=int)])
+
+                # training indices for combined set based on folds:
+                # E with fold != k and O with fold != k
+                train_comb = np.concatenate([
+                    np.where(fold_id_e != k)[0],
+                    n_e + np.where(fold_id_o != k)[0],
+                ])
+
+                rho_x_est = build_classifier(nuis_cfg["rho_x"])
+                rho_x_est.fit(X_comb[train_comb], R_comb[train_comb])
+                nm.rho_x = rho_x_est
+
+            # ---- rho_s_x: P(R=1 | S,X) ----
+            if "rho_s_x" in nuis_cfg:
+                SX_e = np.column_stack([S_e, X_e])
+                SX_o = np.column_stack([S_o, X_o])
+                SX_comb = np.vstack([SX_e, SX_o])
+                R_comb = np.concatenate([np.zeros(n_e, dtype=int), np.ones(n_o, dtype=int)])
+                train_comb = np.concatenate([
+                    np.where(fold_id_e != k)[0],
+                    n_e + np.where(fold_id_o != k)[0],
+                ])
+
+                rho_s_x_est = build_classifier(nuis_cfg["rho_s_x"])
+                rho_s_x_est.fit(SX_comb[train_comb], R_comb[train_comb])
+                nm.rho_s_x = rho_s_x_est
+
+            # ---- h_s_x: E[Y | S,X,R=1] using observational train data ----
+            if "h_s_x" in nuis_cfg:
+                SX_o = np.column_stack([S_o, X_o])
+                h_s_x_est = build_regressor(nuis_cfg["h_s_x"])
+                h_s_x_est.fit(SX_o[train_o], Y_o[train_o])
+                nm.h_s_x = h_s_x_est
+
+            # ---- mu_mean: μ(a,x) using experimental train data + ĥ as pseudo-outcome ----
+            if "mu_mean" in nuis_cfg and nm.h_s_x is not None:
+                # 1) Get ĥ(S,X) on E-train using h_s_x_est fitted on R=1 train data
+                SX_e = np.column_stack([S_e, X_e])
+                h_hat_e_train = nm.h_s_x.predict(SX_e[train_e])
+
+                # 2) Fit separate models for A=0 and A=1
+                mu_cfg = nuis_cfg["mu_mean"]
+
+                # A=0
+                idx0 = train_e[A_e[train_e] == 0]
+                if idx0.size > 0:
+                    mu0_est = build_regressor(mu_cfg)
+                    mu0_est.fit(X_e[idx0], h_hat_e_train[A_e[train_e] == 0])
+                    nm.mu_mean_0 = mu0_est
+
+                # A=1
+                idx1 = train_e[A_e[train_e] == 1]
+                if idx1.size > 0:
+                    mu1_est = build_regressor(mu_cfg)
+                    mu1_est.fit(X_e[idx1], h_hat_e_train[A_e[train_e] == 1])
+                    nm.mu_mean_1 = mu1_est
+
+            folds.append(nm)
+
+        return CrossFittedNuisances(
+            folds=folds,
+            fold_id_e=fold_id_e,
+            fold_id_o=fold_id_o,
+        )

@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn import RandomForestRegressor
 
 class BaseEstimator(ABC):
     """
@@ -17,23 +16,55 @@ class BaseEstimator(ABC):
     def predict(self, X:np.ndarray, **kargs):
         ...
 
-    
 class SklearnRegressor(BaseEstimator):
     """
     Wrapper for sklearn regressors
     """
-    def __init__(self, base = None, **kargs):
-        if base == None:
-            self.model = RandomForestRegressor(**kargs)
-        else:
-            self.model = base(**kargs)
-    
-    def fit(self, X, y):
-        self.model.fit(X, y)
+    def __init__(self, model):
+        self.model = model
+        
+    def fit(self, X, y, sample_weight=None):
+        self.model.fit(X, y, sample_weight=sample_weight)
         return self
 
     def predict(self, X):
         return self.model.predict(X)
+    
+class SklearnClassifier(BaseEstimator):
+    """
+    Wrapper for sklearn classifiers
+    """
+    def __init__(self, model):
+        self.model = model
+        
+    def fit(self, X, y, sample_weight=None):
+        self.model.fit(X, y, sample_weight=sample_weight)
+        return self
+
+    def predict(self, X):
+        return self.model.predict_proba(X)[:, 1]
+    
+class XGBoostRegressor(BaseEstimator):
+    def __init__(self, model):
+        self.model = model
+        
+    def fit(self, X, y, sample_weight=None):
+        self.model.fit(X, y, sample_weight=sample_weight)
+        return self
+
+    def predict(self, X):
+        return self.model.predict(X)
+
+class XGBoostClassifier(BaseEstimator):
+    def __init__(self, model):
+        self.model = model
+        
+    def fit(self, X, y, sample_weight=None):
+        self.model.fit(X, y, sample_weight=sample_weight)
+        return self
+
+    def predict(self, X):
+        return self.model.predict_proba(X)[:, 1]
     
 
 class TorchRegressor(BaseEstimator):
@@ -54,6 +85,8 @@ class TorchRegressor(BaseEstimator):
         # eval mode forward pass
         self.net.eval()
         ...
+
+    
 
 
     

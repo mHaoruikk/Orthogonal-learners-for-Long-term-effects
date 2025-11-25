@@ -32,7 +32,6 @@ class GroundTruth:
     e_O: Callable[[np.ndarray], float]  # e_O(X) = P(A=1 | X, R=1)
     
 
-
 class BaseDataset(ABC):
     """
     Base dataset class for all kinds of datasets.

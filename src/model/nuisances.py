@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 import numpy as np
-import sklearn
+from sklearn.model_selection import KFold
 
 from src.data.base_dataset import TwoSampleDataSplit
 from src.model.base_model import BaseEstimator, SklearnClassifier, XGBoostClassifier
@@ -14,8 +14,8 @@ class NuisanceModels:
     rho_x: Optional[BaseEstimator] = None
     rho_s_x: Optional[BaseEstimator] = None
     h_s_x: Optional[BaseEstimator] = None
-    mu_0: Optional[BaseEstimator] = None   
-    mu_1: Optional[BaseEstimator] = None
+    mu_0_x: Optional[BaseEstimator] = None   
+    mu_1_x: Optional[BaseEstimator] = None
 
 @dataclass
 class CrossFittedNuisances:
@@ -30,18 +30,17 @@ class CrossFittedNuisances:
     fold_id_e: np.ndarray  # shape (n_e,), values in {0,...,K-1}
     fold_id_o: np.ndarray  # shape (n_o,), values in {0,...,K-1}
 
-from sklearn.model_selection import KFold
 
 class NuisanceFactory:
     """
-    Factory that, given ModelConfig and data, fits nuisances via K-fold cross-fitting.
+    Factory that, given Model Config and data, fits nuisances via K-fold cross-fitting.
 
     - For each fold k, we fit nuisances on the training portion of that fold
       (separately for experimental and observational parts where needed).
     - We return K sets of NuisanceModels plus fold assignments.
     """
 
-    def __init__(self, model_cfg: ModelConfig):
+    def __init__(self, model_cfg):
         self.model_cfg = model_cfg
         self.K = model_cfg.num_crossfit
 
@@ -135,33 +134,38 @@ class NuisanceFactory:
                 h_s_x_est.fit(SX_o[train_o], Y_o[train_o])
                 nm.h_s_x = h_s_x_est
 
-            # ---- mu_mean: μ(a,x) using experimental train data + ĥ as pseudo-outcome ----
-            if "mu_mean" in nuis_cfg and nm.h_s_x is not None:
-                # 1) Get ĥ(S,X) on E-train using h_s_x_est fitted on R=1 train data
+            # ---- mu_mean: μ(a,x) using experimental train data + \hat{h} as pseudo-outcome ----
+            if "mu_0_x" in nuis_cfg and nm.h_s_x is not None:
+                #Get \hat{h}(S,X) on E-train using h_s_x_est fitted on R=1 train data
                 SX_e = np.column_stack([S_e, X_e])
                 h_hat_e_train = nm.h_s_x.predict(SX_e[train_e])
 
-                # 2) Fit separate models for A=0 and A=1
-                mu_cfg = nuis_cfg["mu_mean"]
+                #Fit separate models for A=0 and A=1
+                mu_cfg_0 = nuis_cfg["mu_0_x"]
 
                 # A=0
                 idx0 = train_e[A_e[train_e] == 0]
                 if idx0.size > 0:
-                    mu0_est = build_regressor(mu_cfg)
+                    mu0_est = build_regressor(mu_cfg_0)
                     mu0_est.fit(X_e[idx0], h_hat_e_train[A_e[train_e] == 0])
-                    nm.mu_mean_0 = mu0_est
+                    nm.mu_0_x = mu0_est
+                else:
+                    raise ValueError("No training samples with A=0 in {k}-th fold")
 
                 # A=1
+                mu_cfg_1 = nuis_cfg["mu_1_x"]
                 idx1 = train_e[A_e[train_e] == 1]
                 if idx1.size > 0:
-                    mu1_est = build_regressor(mu_cfg)
+                    mu1_est = build_regressor(mu_cfg_1)
                     mu1_est.fit(X_e[idx1], h_hat_e_train[A_e[train_e] == 1])
-                    nm.mu_mean_1 = mu1_est
+                    nm.mu_1_x = mu1_est
+                else:
+                    raise ValueError("No training samples with A=1 in {k}-th fold")
 
             folds.append(nm)
 
         return CrossFittedNuisances(
             folds=folds,
             fold_id_e=fold_id_e,
-            fold_id_o=fold_id_o,
+            fold_id_o=fold_id_o
         )

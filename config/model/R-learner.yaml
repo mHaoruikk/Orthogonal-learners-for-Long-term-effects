@@ -48,11 +48,14 @@ nuisances:
       learning_rate: 0.1
       subsample: 0.8
       colsample_bytree: 0.8
-  mu_mean: #config for \mu(a,x)
+  mu_0_x: #config for \mu(a,x)
     type: lasso # lasso, ridge, elasticnet, linear
     parameters:
-      fit_intercept: true
-
+      fit_intercept: False
+  mu_1_x: #config for \mu(a,x)
+    type: lasso # lasso, ridge, elasticnet, linear
+    parameters:
+      fit_intercept: False
 
 cate_regressor:
   type: xgboost

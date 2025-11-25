@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 import numpy as np
+import sklearn
 
 from src.data.base_dataset import TwoSampleDataSplit
 from src.model.base_model import BaseEstimator, SklearnClassifier, XGBoostClassifier

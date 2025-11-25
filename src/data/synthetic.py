@@ -1,4 +1,4 @@
-from base_dataset import BaseDataset, TwoSampleDataSplit, GroundTruth
+from src.data.base_dataset import BaseDataset, TwoSampleDataSplit, GroundTruth
 from abc import ABC, abstractmethod
 from typing import Tuple
 import numpy as np
@@ -23,6 +23,13 @@ class BaseSyntheticDataset(BaseDataset):
         self.n_o = config.n_o
         self.sigma_s = config.sigma_s
         self.sigma_y = config.sigma_y
+
+        self.dim_x = config.dim_x
+        
+        self.X_e, self.X_o = None, None
+        self.A_e, self.A_o = None, None
+        self.S_e, self.S_o = None, None
+        self.Y_e, self.Y_o = None, None
 
     @abstractmethod
     def sample_covariates(self, ):
@@ -116,17 +123,22 @@ class BaseSyntheticDataset(BaseDataset):
         # 5. Long-term outcome in O
         tau_Y_o = self.tau_Y(X_o)
         eps_o = rng.normal(loc=0.0, scale=self.sigma_y, size=self.n_o)
-
         b_o = self.b(X_o, S_o)
         Y_o = b_o + (A_o - 0.5) * tau_Y_o + eps_o
 
+        # Long-term outcome in E (not observed)
+        tau_Y_e = self.tau_Y(X_e)
+        eps_e = rng.normal(loc=0.0, scale=self.sigma_y, size=self.n_e)
+        b_e = self.b(X_e, S_e)
+        Y_e = b_e + (A_e - 0.5) * tau_Y_e + eps_e
+
         data = TwoSampleDataSplit(
-            X_e=X_e,
-            A_e=A_e,
-            S_e=S_e,
-            X_o=X_o,
-            S_o=S_o,
-            Y_o=Y_o,
+            X_e=X_e.copy(),
+            A_e=A_e.copy(),
+            S_e=S_e.copy(),
+            X_o=X_o.copy(),
+            S_o=S_o.copy(),
+            Y_o=Y_o.copy(),
         )
 
         gt = GroundTruth(
@@ -134,6 +146,10 @@ class BaseSyntheticDataset(BaseDataset):
             pi_E=self.pi_E,
             e_O=self.e_O
         )
+
+        self.X_e, self.A_e, self.S_e, self.Y_e = X_e, A_e, S_e, Y_e
+        self.X_o, self.A_o, self.S_o, self.Y_o = X_o, A_o, S_o, Y_o
+
         return data, gt
     
     def _trim(self, u, eta = 0.1):
@@ -156,7 +172,7 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
     
     def pi_E(self, X:np.ndarray) -> np.ndarray:
         if self.propensity_E == "sin":
-            return self._trim(np.sin(np.pi * X[:, 0] * X[:, 1]))
+            return self._trim(np.sin(np.pi * (X[:, 0] * X[:, 1] + 1) / 2))
         elif self.propensity_E == "exp":
             logits = 0.5 * X[:, 0] + 0.5 * X[:, 1]
             pi = 1 / (1 + np.exp(-logits))
@@ -182,7 +198,7 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         )
 
     def tau_S(self, X: np.ndarray) -> np.ndarray:
-        return 0.5 * (X[:, 0] + X[:, 1])
+        return 0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3]) + 1
 
     def b(self, X: np.ndarray, S: np.ndarray) -> np.ndarray:
         return X[:, 6] ** 2 + X[:, 7] + S

@@ -15,7 +15,7 @@ class TLearner:
         self.y1_estimator = None
 
     def fit(self, data: TwoSampleDataSplit):
-        cf_nuis = self.nuisance_factory.fit_crossfit(data)
+        cf_nuis = self.nuisance_factory.crossfit_nuisance(data)
         X_e, A_e, S_e = data.X_e, data.A_e, data.S_e
         K = self.model_cfg.num_crossfit
 
@@ -27,13 +27,13 @@ class TLearner:
         reg0 = build_regressor(g_cfg)
         reg1 = build_regressor(g_cfg)
 
-        # Build pseudo-outcomes using cross-fitted h_s_x
+        # Build pseudo-outcomes using cross-fitted h
         Y_tilde = np.empty_like(S_e, dtype=float)
         for k in range(K):
             nm_k = cf_nuis.folds[k]
             idx_k = np.where(cf_nuis.fold_id_e == k)[0]
             SX_e_k = np.column_stack([S_e[idx_k], X_e[idx_k]])
-            Y_tilde[idx_k] = nm_k.h_s_x.predict(SX_e_k)
+            Y_tilde[idx_k] = nm_k.h.predict(SX_e_k)
 
         # Now T-learner on (X_e, A_e, Y_tilde)
         reg0.fit(X_e[A_e == 0], Y_tilde[A_e == 0])

@@ -5,19 +5,20 @@ lambda_type: none
 num_crossfit: 3
 
 nuisances:
-  h_s_x:     #config for h(S,X)
+  h:     #config for h(S,X)
     type: xgboost
+    crossfit: false # in t-learner, no need to crossfit h
     parameters:
       n_estimators: 100
       max_depth: 5
       learning_rate: 0.1
       subsample: 0.8
       colsample_bytree: 0.8
-  mu_0_x: #config for \mu(a,x)
+  mu_0: #config for \mu(a,x)
     type: lasso # lasso, ridge, elasticnet, linear
     parameters:
       fit_intercept: False
-  mu_1_x: #config for \mu(a,x)
+  mu_1: #config for \mu(a,x)
     type: lasso # lasso, ridge, elasticnet, linear
     parameters:
       fit_intercept: False

@@ -4,3 +4,5 @@ defaults:
  - trainer: default
 
 seed: 2025
+val_fraction: 0.2
+test_fraction: 0.2

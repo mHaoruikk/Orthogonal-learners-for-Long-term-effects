@@ -13,9 +13,9 @@ class NuisanceModels:
     pi_s_x: Optional[BaseEstimator] = None
     rho_x: Optional[BaseEstimator] = None
     rho_s_x: Optional[BaseEstimator] = None
-    h_s_x: Optional[BaseEstimator] = None
-    mu_0_x: Optional[BaseEstimator] = None   
-    mu_1_x: Optional[BaseEstimator] = None
+    h: Optional[BaseEstimator] = None
+    mu_0: Optional[BaseEstimator] = None   
+    mu_1: Optional[BaseEstimator] = None
 
 @dataclass
 class CrossFittedNuisances:
@@ -64,9 +64,18 @@ class NuisanceFactory:
 
         return fold_id_e, fold_id_o
 
-    def fit_crossfit(self, data: TwoSampleDataSplit) -> CrossFittedNuisances:
+    def crossfit_nuisance(self, data: TwoSampleDataSplit) -> CrossFittedNuisances:
         X_e, A_e, S_e = data.X_e, data.A_e, data.S_e
         X_o, S_o, Y_o = data.X_o, data.S_o, data.Y_o
+
+
+        # ---- h: E[Y | S,X,R=1] using full observational train data ----
+        if "h" in self.model_cfg.nuisances:
+            if not self.model_cfg.nuisances["h"].get("crossfit", True):
+                #fit h on full O-data
+                SX_o = np.column_stack([S_o, X_o])
+                h_est = build_regressor(self.model_cfg.nuisances["h"])
+                h_est.fit(SX_o, Y_o)
 
         n_e, n_o = X_e.shape[0], X_o.shape[0]
         fold_id_e, fold_id_o = self._make_folds(n_e, n_o)
@@ -75,25 +84,33 @@ class NuisanceFactory:
 
         for k in range(self.K):
             # Training indices for this fold
-            train_e = np.where(fold_id_e != k)[0]
-            train_o = np.where(fold_id_o != k)[0]
+            idx_e = np.where(fold_id_e != k)[0]
+            idx_o = np.where(fold_id_o != k)[0]
 
             # Build nuisances according to config
             nuis_cfg = self.model_cfg.nuisances
 
             nm = NuisanceModels()
+            if "h" in nuis_cfg:
+                if not self.model_cfg.nuisances["h"].get("crossfit", True):
+                    nm.h = h_est
+                else: #crossfit h on obs data
+                    SX_o = np.column_stack([S_o, X_o])
+                    h_est = build_regressor(nuis_cfg["h"])
+                    h_est.fit(SX_o[idx_o], Y_o[idx_o])
+                    nm.h = h_est
 
             # ---- pi_x: P(A=1 | X, R=0) using experimental train data ----
             if "pi_x" in nuis_cfg:
                 pi_x_est = build_classifier(nuis_cfg["pi_x"])
-                pi_x_est.fit(X_e[train_e], A_e[train_e])
+                pi_x_est.fit(X_e[idx_e], A_e[idx_e])
                 nm.pi_x = pi_x_est
 
             # ---- pi_s_x: P(A=1 | S,X,R=0) ----
             if "pi_s_x" in nuis_cfg:
                 Z_e = np.column_stack([S_e, X_e])  # shape (n_e, 1+d)
                 pi_s_x_est = build_classifier(nuis_cfg["pi_s_x"])
-                pi_s_x_est.fit(Z_e[train_e], A_e[train_e])
+                pi_s_x_est.fit(Z_e[idx_e], A_e[idx_e])
                 nm.pi_s_x = pi_s_x_est
 
             # ---- rho_x: P(R=1 | X) using combined E+O ----
@@ -127,42 +144,43 @@ class NuisanceFactory:
                 rho_s_x_est.fit(SX_comb[train_comb], R_comb[train_comb])
                 nm.rho_s_x = rho_s_x_est
 
-            # ---- h_s_x: E[Y | S,X,R=1] using observational train data ----
-            if "h_s_x" in nuis_cfg:
-                SX_o = np.column_stack([S_o, X_o])
-                h_s_x_est = build_regressor(nuis_cfg["h_s_x"])
-                h_s_x_est.fit(SX_o[train_o], Y_o[train_o])
-                nm.h_s_x = h_s_x_est
+            folds.append(nm)
 
-            # ---- mu_mean: μ(a,x) using experimental train data + \hat{h} as pseudo-outcome ----
-            if "mu_0_x" in nuis_cfg and nm.h_s_x is not None:
-                #Get \hat{h}(S,X) on E-train using h_s_x_est fitted on R=1 train data
-                SX_e = np.column_stack([S_e, X_e])
-                h_hat_e_train = nm.h_s_x.predict(SX_e[train_e])
+        # ---- mu_mean: \mu(a,x) fitted on experimental train data + \hat{h} as pseudo-outcome ----
+        if "mu_0" in nuis_cfg and nm.h is not None:
+            #Get \hat{h}(S,X) on E-train using h_est fitted on R=1 train data
+            SX_e = np.column_stack([S_e, X_e])
+            #\hat{h} is the mean from all the k splits' predictions (this is fine because h is fit only on R=1 data)
+            h_hat_e_train = np.zeros(X_e.shape[0], dtype=float)
+            for k in range(self.K):
+                h_hat = folds[k].h.predict(SX_e)
+                h_hat_e_train += h_hat[idx_e]
+            h_hat_e_train /= self.K
 
+            for k in range(self.K):
+                nm = folds[k]
+                idx_e = np.where(fold_id_e != k)[0]
                 #Fit separate models for A=0 and A=1
-                mu_cfg_0 = nuis_cfg["mu_0_x"]
+                mu_cfg_0 = nuis_cfg["mu_0"]
 
                 # A=0
-                idx0 = train_e[A_e[train_e] == 0]
+                idx0 = idx_e[A_e[idx_e] == 0]
                 if idx0.size > 0:
                     mu0_est = build_regressor(mu_cfg_0)
-                    mu0_est.fit(X_e[idx0], h_hat_e_train[A_e[train_e] == 0])
-                    nm.mu_0_x = mu0_est
+                    mu0_est.fit(X_e[idx0], h_hat_e_train[A_e[idx_e] == 0])
+                    nm.mu_0 = mu0_est
                 else:
                     raise ValueError("No training samples with A=0 in {k}-th fold")
 
                 # A=1
-                mu_cfg_1 = nuis_cfg["mu_1_x"]
-                idx1 = train_e[A_e[train_e] == 1]
+                mu_cfg_1 = nuis_cfg["mu_1"]
+                idx1 = idx_e[A_e[idx_e] == 1]
                 if idx1.size > 0:
                     mu1_est = build_regressor(mu_cfg_1)
-                    mu1_est.fit(X_e[idx1], h_hat_e_train[A_e[train_e] == 1])
-                    nm.mu_1_x = mu1_est
+                    mu1_est.fit(X_e[idx1], h_hat_e_train[A_e[idx_e] == 1])
+                    nm.mu_1 = mu1_est
                 else:
                     raise ValueError("No training samples with A=1 in {k}-th fold")
-
-            folds.append(nm)
 
         return CrossFittedNuisances(
             folds=folds,

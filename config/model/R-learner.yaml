@@ -59,13 +59,10 @@ nuisances:
       fit_intercept: False
 
 cate_regressor:
-  type: xgboost
+  type: solve_linear
   parameters:
-    n_estimators: 200
-    max_depth: 5
-    learning_rate: 0.05
-    subsample: 0.8
-    colsample_bytree: 0.8
-
+    feature_type: linear      #[linear,]
+    fit_intercept: false
+    regularization: 1e-3
 
   

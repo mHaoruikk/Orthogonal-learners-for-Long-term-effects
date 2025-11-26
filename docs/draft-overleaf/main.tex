@@ -196,6 +196,126 @@ Based on the weighted orthogonal loss, the empirical risk that we can derive rig
 \begin{proof}
     See Appendix~\ref{app:proofs} for detailed proof.
 \end{proof}
+%
+%
+%
+\subsection{Special cases of the orthogonal learner}
+\paragraph{(i) Unweighted case $\lambda(\pi)\equiv 1$ (Standard DR-learner).}
+When $\lambda(\pi(X))\equiv 1$, we have
+
+\begin{equation}
+    \lambda(\pi(X)) = 1,\qquad
+    \lambda'(\pi(X)) = 0,\qquad
+    D = \E[1\mid R=0] = 1,
+\end{equation}
+
+and therefore
+
+\begin{equation}
+    \rho(A,\pi(X))
+    = \lambda(\pi(X)) + (A-\pi(X))\lambda'(\pi(X))
+    = 1.
+\end{equation}
+
+The observational correction term reduces to
+\begin{equation}
+    \psi^1_1(Z;\eta) = \kappa(S,X)\{Y-h(S,X)\},
+\end{equation}
+
+while the experimental pseudo-outcome becomes
+\begin{equation}
+    \phi^0_1(Z)
+    = \mu(1,X)-\mu(0,X) + \Delta_h(S,X),
+\end{equation}
+
+Plugging these into \eqref{eq:ortho-loss} yields the unweighted orthogonal loss
+
+\begin{equation}
+\label{eq:DR-ortho-loss}
+    \mathcal{L}_1(g;\eta)
+  = \frac{1}{p_0}\E\Big[
+      \1\{R=0\}\,\big\{\mu(1,X)-\mu(0,X) + \Delta_h(S,X)-g(X)\big\}^2
+      - 2\,\1\{R=1\}\,\kappa(S,X)\{Y-h(S,X)\}\,g(X)
+    \Big].
+\end{equation}
+
+
+By Lemma~\ref{lemma:equiv-orthogonal-loss}, at the true nuisances $\eta_0$ this loss is equivalent (in the sense of having the same minimizer) to the unweighted oracle risk
+\begin{equation}
+\label{eq:oracle-unweighted-loss}
+    \mathcal{R}_1(g)
+  = \E\bigl[(\tau^0(X)-g(X))^2\mid R=0\bigr].
+\end{equation}
+
+
+\paragraph{(ii) R-learner $\lambda(\pi)=\pi(X)\{1-\pi(X)\}$.}
+Let $\lambda_{ov}(\pi)=\pi(1-\pi)$. Then
+\[
+\lambda_{ov}(\pi(X)) = \pi(X)\{1-\pi(X)\},
+\qquad
+\lambda'_{ov}(\pi(X)) = 1-2\pi(X).
+\]
+The augmented weight simplifies to
+\begin{align*}
+\rho(A,\pi(X))
+  &= \lambda_{ov}(\pi(X)) + (A-\pi(X))\lambda'_{ov}(\pi(X)) \\
+  &= \pi(X)\{1-\pi(X)\} + (A-\pi(X))(1-2\pi(X)) \\
+  &= (A-\pi(X))^2.
+\end{align*}
+Since 
+\[
+\Delta_h(S,X)
+  = \frac{A-\pi(X)}{\pi(X)\{1-\pi(X)\}}\bigl(h(S,X)-\mu(A,X)\bigr),
+\]
+we obtain
+\begin{equation}
+    \frac{\lambda_{ov}(\pi(X))}{\rho(A,\pi(X))}\,\Delta_h(S,X)
+  = \frac{h(S,X)-\mu(A,X)}{A-\pi(X)},
+\end{equation}
+
+so that the overlap-weighted pseudo-outcome takes the R-learner–type form
+\begin{equation}
+    \phi^0_{ov}(Z)
+  = \mu(1,X)-\mu(0,X)
+    + \frac{h(S,X)-\mu(A,X)}{A-\pi(X)}.
+\end{equation}
+
+For the observational correction, we have
+\begin{equation}
+    \psi^1_{ov}(Z;\eta)
+  = \lambda_{ov}(\pi(X))\,\kappa(S,X)\{Y-h(S,X)\},
+\end{equation}
+
+and since
+\begin{equation}
+    \kappa(S,X)
+  = \frac{1-\rho(S,X)}{\rho(S,X)}
+    \frac{\pi(S,X)-\pi(X)}{\pi(X)\{1-\pi(X)\}},
+\end{equation}
+
+the factor $\lambda_{ov}(\pi(X))=\pi(X)\{1-\pi(X)\}$ cancels in the denominator, yielding
+\begin{equation}
+    \psi^1_{ov}(Z;\eta)
+  = \frac{1-\rho(S,X)}{\rho(S,X)}
+    \bigl(\pi(S,X)-\pi(X)\bigr)\{Y-h(S,X)\}.
+\end{equation}
+
+Denoting $D_{ov}=\E[\pi(X)\{1-\pi(X)\}\mid R=0]$, the corresponding overlap-weighted orthogonal loss specializes to
+\[
+\mathcal{L}_{R}(g;\eta)
+  = \frac{1}{D_{\mathrm{R}}\,p_0}\E\Big[
+      \1\{R=0\}\{A-\pi(X)\}^2\big\{\phi^0_{ov}(Z)-g(X)\big\}^2
+      - 2\,\1\{R=1\}\,\psi^1_{ov}(Z;\eta)\,g(X)
+    \Big].
+\]
+By Lemma~\ref{lemma:equiv-orthogonal-loss}, at $\eta=\eta_0$ this loss is equivalent to the overlap-weighted oracle risk
+\[
+\mathcal{R}_{ov}(g)
+  = \E\bigl[\pi(X)\{1-\pi(X)\}\bigl(\tau^0(X)-g(X)\bigr)^2\mid R=0\bigr],
+\]
+so that its minimizer targets the experimental CATE under propensity-overlap weights, focusing estimation on covariate regions with the largest treatment uncertainty.
+
+
 
 
 
@@ -216,6 +336,20 @@ Here $\widetilde{\phi}^0_\lambda(Z)$'s $h(S,X)$ is replaced by the targeted $\wi
 \begin{equation}
     \widetilde{\phi}^0_\lambda(Z)=\mu(1,X)-\mu(0,X)+\frac{\lambda(\pi(X))}{\rho(A,\pi)}\cdot \frac{A-\pi(X)}{\pi(X)(1-\pi(X))}(Y - \textcolor{red}{\widetilde{h}(S,X)}).
 \end{equation}.
+
+\section{Implementation}
+Given the loss in Eq.~\ref{eq:ortho-loss}, which has a particularly interesting feature: It is quaratic w.r.t. $g$ when $R=0$ but linear when $R=1$. To keep things clear, we start with a linear $g_\theta(x) = \theta^\top f(x)$, where $f$ is a feature mapping (e.g. identify, constant augmented or spline. In this case, the optimization is completely convex and the stationary point is guaranteed to be the minimizer. 
+
+Plug the above parmaterization, we can get the parameter $\theta^*$ satisfies:
+\begin{equation}
+    \bigl(\sum_{R_i=0}\rho_i f_if_i^\top\bigr)\theta^* = \sum_{R_i=0}\rho_i\phi_i f_i + \sum_{R_i=1}\psi_i f_i.
+\end{equation}
+Let $H = \sum_{R_i=0}\rho_i X_iX_i^\top)$ and $b = \sum_{R_i=0}\rho_i\phi_i X_i + \sum_{R_i=1}\psi_i X_i.$ Then we just need to solve the equation $\theta^* = H^{-1}b$. The complexity is roughly $O(n\cdot p^3)$. 
+
+For simplicity we keep $f(x) = (x, 1).$
+
+
+
 
 \section{Experiment}
 \paragraph{Goal of experiment}
@@ -253,10 +387,10 @@ Under the surrogacy assumption, the effect of the treatment $A$ is fully mediate
 \paragraph{Setup A: complex $\pi$}
 We now instantiate the above generic framework in analogy with Setup~A of \citet{Nie.2021} (with surrogacy)
 
-Let $X \sim \mathrm{Unif}([0,1]^{10})$, and define the treatment propensity on the experiment dataset to be:
+Let $X \sim \mathrm{Unif}([-1,1]^{10})$, and define the treatment propensity on the experiment dataset to be:
 \begin{equation}
     \pi^*(X)
-    = \mathrm{trim}_{0.1}\!\big(\sin(\pi X_1 X_2)\big),
+    = \mathrm{trim}_{0.1}\!\big(\sin(\pi \frac{X_1 X_2 + 1}{2})\big),
     \qquad
     \mathrm{trim}_{\eta}(u)
     := \max\{\eta,\min(u,1-\eta)\}.
@@ -273,7 +407,7 @@ For short-term outcome $S$, We re-use the main effect from the original Setup~A 
       + 2(X_3 - 0.5)^2
       + X_4 + 0.5 X_5 + X_6.
 \end{equation}
-We set the short-term treatment effect equal to the original simple CATE:$\tau_S^*(X) = \frac{X_1 + X_2}{2}.$ Thus,
+We set the short-term treatment effect equal to the original simple CATE: $\tau_S^*(X) = 1 +\frac{X_1 + X_2 + X_3 + X_4}{4}.$ Thus,
 \begin{equation}
     S
     = a^*(X)
@@ -293,8 +427,7 @@ Under this setup, the long-term CATE is:
     \tau(X)
     = \E[Y^1 - Y^0 \mid X]
     = S^1 - S^0
-    = \tau_S^*(X)
-    = \frac{X_1 + X_2}{2}.
+    = \tau_S^*(X).
 \end{equation}
 
 \paragraph{Setup B: Normal $\pi$}
@@ -304,6 +437,192 @@ In this setup, we consider a relatively stable treatment propensity which is eas
     := 0.5 \;+\; 0.25 \,\tanh\!\big(v(X)\big), \qquad v(X)= \frac{X_1 + X_2}{2}.
 \end{equation}
 Else remain the same with setup A.
+%
+%
+%
+%
+%
+\subsection{Baseline learners based on surrogate imputation}
+\label{sec:baselines}
+
+In order to benchmark our overlap-weighted orthogonal learner, we now derive several simpler baselines that use the surrogate regression $h(S,X)$ in a plug-in fashion, i.e. we don't correct the first order bias of the imputation $h$. Throughout this subsection, let $\widehat{h}(s,x)$ denote an estimator of $h(s,x)$ fitted only on the observational sample $\{(X,S,Y):R=1\}$, and define the \textbf{surrogate-imputed outcome} on the experimental sample $(R=0)$ as
+\begin{equation}
+\label{eq:y-imputation-from-h}
+    \widetilde{Y} \;=\; \widehat{h}(S,X), \qquad\text{for } R=0.
+\end{equation}
+
+We then treat $(X,A,\widetilde{Y})$ as if it were a randomized experiment and build S/T-learners, IPW and AIPW-type learners, as well as overlap-weighted variants.
+
+\paragraph{1. Surrogate S/T-learners (plug-in using $\widehat{h}$).}
+A first family of baselines ignores the structure of the surrogate model at the second stage and simply regresses $\widetilde{Y}$ on $(X,A)$ in the experimental sample.
+
+\medskip
+\noindent\textbf{Surrogate S-learner.}
+We fit a single regression function
+\begin{equation}
+    m_S(a,x)\;\approx\;\E[\widetilde{Y}\mid A=a,X=x,R=0],
+\end{equation}
+
+by minimizing the population mean squared error
+\begin{equation}
+\label{eq:S-learner-loss}
+    \mathcal{L}^{S}(m_S)
+    \;=\;
+    \E\Big[\bigl(\widetilde{Y}-m_S(A,X)\bigr)^2 \mid R=0\Big] \;+\; \lambda_{reg}\|m_S\|.
+\end{equation}
+The corresponding CATE estimate is
+\begin{equation}
+    g_S(x)
+  \;=\; m_S(1,x)-m_S(0,x).
+\end{equation}
+
+
+
+\medskip
+\noindent\textbf{Surrogate T-learner.}
+Alternatively, we fit two separate regressions
+\begin{equation}
+    m_T^a(x) \;\approx\; \E[\widetilde{Y}\mid A=a,X=x,R=0],
+\qquad a\in\{0,1\},
+\end{equation}
+
+by minimizing
+\begin{equation}
+    \mathcal{L}^{T,a}(m_T^a)
+  \;=\;
+  \E\Big[\bigl(\widetilde{Y}-m_T^a(X)\bigr)^2 \mid R=0,A=a\Big] \;+\; \lambda_{reg}\|m_T^a\|, \quad a \in \{0,1\}.
+\end{equation}
+And the CATE is
+\begin{equation}
+    g_T(x) \;=\; m_T^1(x)-m_T^0(x).
+\end{equation}
+
+
+
+\medskip
+\noindent\textbf{Overlap-weighted variants.}
+For completeness, we can also define overlap-weighted S-/T-learners by introducing a generic weight function $\lambda(\pi(X))$:
+\begin{equation}
+    \mathcal{L}^{S}_\lambda(m_S)
+  = \frac{1}{D}
+    \E\Big[\lambda(\pi(X))\bigl(\widetilde{Y}-m_S(A,X)\bigr)^2 \mid R=0\Big] \;+\; \lambda_{reg}\|m_S\|,
+\end{equation}
+
+
+\begin{equation}
+    \mathcal{L}^{T,a}_\lambda(m_T^a)
+  = \frac{1}{D}
+    \E\Big[\lambda(\pi(X))\bigl(\widetilde{Y}-m_T^a(X)\bigr)^2 \mid R=0,A=a \Big]\;+\; \lambda_{reg}\|m_T^a\|,\quad a \in \{0,1\},
+\end{equation}
+
+with $D=\E[\lambda(\pi(X))\mid R=0]$. In this way the surrogate S-/T-learners target a $\lambda$-overlap–weighted version of the CATE.
+
+\paragraph{2. Surrogate IPW meta-learner.}
+We now construct a meta-learner that uses an inverse-propensity pseudo-outcome, again treating $\widetilde{Y}$ as the long-term outcome in the experimental sample.
+
+Let $\pi(x)=\Pr(A=1\mid X=x,R=0)$ denote the treatment propensity in the experiment, and view $\pi$ as a nuisance function estimated from the experimental sample. Define the IPW pseudo-outcome
+\[
+\phi^{\mathrm{IPW}}(Z)
+  \;:=\;
+  \frac{A\,\widetilde{Y}}{\pi(X)} - \frac{(1-A)\,\widetilde{Y}}{1-\pi(X)}, 
+  \qquad\text{for } R=0.
+\]
+Under correct $\pi(\cdot)$ and a correctly specified surrogate model, we have
+\[
+\E\bigl[\phi^{\mathrm{IPW}}(Z)\mid X,R=0\bigr]
+  \;=\; \tau^0(X),
+\]
+so that the regression of $\phi^{\mathrm{IPW}}$ on $X$ recovers the experimental CATE.
+
+The surrogate IPW learner $g_{\mathrm{IPW}}$ is then defined as
+\[
+g_{\mathrm{IPW}}
+  \;=\; \argmin_{g\in\mathcal{G}} \mathcal{L}^{\mathrm{IPW}}(g),
+\qquad
+\mathcal{L}^{\mathrm{IPW}}(g)
+  \;=\;
+  \frac{1}{p_0}\E\Big[\1\{R=0\}\bigl(\phi^{\mathrm{IPW}}(Z)-g(X)\bigr)^2\Big],
+\]
+with $\mathcal{L}^{\mathrm{IPW}}(g)$ approximated by its empirical average over $\{i:R_i=0\}$.
+
+An overlap-weighted version is obtained by replacing the risk with
+\[
+\mathcal{L}^{\mathrm{IPW}}_\lambda(g)
+  \;=\;
+  \frac{1}{D p_0}\E\Big[\1\{R=0\}\lambda(\pi(X))\bigl(\phi^{\mathrm{IPW}}(Z)-g(X)\bigr)^2\Big],
+\]
+so that $g$ targets the $\lambda$-weighted CATE.
+
+\paragraph{3. Surrogate AIPW (double-robust) meta-learner.}
+We next define an AIPW-based learner that is doubly robust in the usual sense, but uses the surrogate-imputed outcome $\widetilde{Y}$. We propose to refer to this baseline as the \emph{surrogate double-robust learner} (SDR-learner), since it applies the classical AIPW construction to the surrogate-imputed long-term outcome.
+
+Let
+\[
+\mu_a(x) = \E[\widetilde{Y}\mid A=a,X=x,R=0], \qquad a\in\{0,1\},
+\]
+denote the (short-term) outcome regressions in the experimental sample, and $\pi(x)=\Pr(A=1\mid X=x,R=0)$ the propensity score as above. Consider the AIPW pseudo-outcome
+\[
+\phi^{\mathrm{DR}}(Z;\eta^{\mathrm{DR}})
+  \;:=\;
+  \mu_1(X)-\mu_0(X)
+  + \frac{A}{\pi(X)}\bigl\{\widetilde{Y}-\mu_1(X)\bigr\}
+  - \frac{1-A}{1-\pi(X)}\bigl\{\widetilde{Y}-\mu_0(X)\bigr\},
+\]
+where $\eta^{\mathrm{DR}}=(\mu_0,\mu_1,\pi)$ collects the nuisance functions. Under standard unconfoundedness for the experiment, $\E[\phi^{\mathrm{DR}}(Z;\eta_0^{\mathrm{DR}})\mid X,R=0]=\tau^0(X)$ whenever either $\pi(\cdot)$ or $\mu_a(\cdot)$ is correctly specified (double robustness).
+
+The surrogate DR-learner $g_{\mathrm{DR}}$ is then defined by the squared-error risk
+\[
+g_{\mathrm{DR}}
+  = \argmin_{g\in\mathcal{G}}
+    \mathcal{L}^{\mathrm{DR}}(g;\eta^{\mathrm{DR}}),
+\qquad
+\mathcal{L}^{\mathrm{DR}}(g;\eta^{\mathrm{DR}})
+  = \frac{1}{p_0}\E\Big[\1\{R=0\}\bigl(\phi^{\mathrm{DR}}(Z;\eta^{\mathrm{DR}})-g(X)\bigr)^2\Big].
+\]
+As before, $\mathcal{L}^{\mathrm{DR}}$ is implemented via its empirical analogue with estimated nuisances.
+
+We may also define an overlap-weighted SDR-learner via
+\[
+\mathcal{L}^{\mathrm{DR}}_\lambda(g;\eta^{\mathrm{DR}})
+  = \frac{1}{D p_0}\E\Big[
+      \1\{R=0\}\lambda(\pi(X))
+      \bigl(\phi^{\mathrm{DR}}(Z;\eta^{\mathrm{DR}})-g(X)\bigr)^2
+    \Big],
+\]
+which targets the $\lambda$-weighted CATE analogously to our proposed method, but without exploiting the observational sample $R=1$ at the second stage.
+
+\paragraph{4. Additional plausible baselines.}
+Beyond the above S-/T-, IPW- and SDR-learners, several additional baselines are natural in our setting:
+
+\medskip
+\noindent\textbf{(a) Surrogate R-learner (SR-learner).}
+This baseline applies the classical R-learner of \citet{Nie.2021} directly to the surrogate-imputed outcome $\widetilde{Y}$ in the experimental sample. Let
+\[
+m(X)=\E[\widetilde{Y}\mid X,R=0]
+\]
+be the marginal outcome regression, and $\pi(X)$ the propensity score. The standard R-learner pseudo-outcome is
+\[
+\phi^{\mathrm{SR}}(Z;\eta^{\mathrm{SR}})
+  = \frac{\widetilde{Y}-m(X)}{A-\pi(X)},
+  \qquad \eta^{\mathrm{SR}}=(m,\pi),
+\]
+and the SR-learner minimizes
+\[
+\mathcal{L}^{\mathrm{SR}}(g;\eta^{\mathrm{SR}})
+  = \frac{1}{p_0}\E\Big[
+      \1\{R=0\}(A-\pi(X))^2
+      \bigl(\phi^{\mathrm{SR}}(Z;\eta^{\mathrm{SR}})-g(X)\bigr)^2
+    \Big].
+\]
+This corresponds exactly to the original R-learner, except that it uses the surrogate-imputed outcome $\widetilde{Y}$ instead of the true long-term outcome $Y$ and does not leverage the observational sample beyond the first-stage fit of $\widehat{h}$.
+
+\medskip
+\noindent\textbf{(b) Re-targted learners.}
+We will decide whether to develop the re-targeted learners based on the experiment.
+
+\medskip
+These baselines allow us to isolate the ablations: (i) the benefit of using overlap weighted loss, (ii) the benefit of orthogonalization, and (iii) the additional gains from combining experimental and observational data in a fully orthogonal, overlap-weighted way as in our proposed method.
+
 
 
 

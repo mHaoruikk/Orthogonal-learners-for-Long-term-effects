@@ -154,7 +154,7 @@ class NuisanceFactory:
             h_hat_e_train = np.zeros(X_e.shape[0], dtype=float)
             for k in range(self.K):
                 h_hat = folds[k].h.predict(SX_e)
-                h_hat_e_train += h_hat[idx_e]
+                h_hat_e_train += h_hat
             h_hat_e_train /= self.K
 
             for k in range(self.K):

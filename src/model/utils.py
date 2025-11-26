@@ -1,4 +1,5 @@
-from src.model.base_model import SklearnClassifier, SklearnRegressor, XGBoostClassifier, XGBoostRegressor
+from src.model.base_model import SklearnClassifier, SklearnRegressor, XGBoostClassifier, XGBoostRegressor, \
+    ClosedFormLinear
 
 from sklearn.linear_model import (
     LogisticRegression,
@@ -26,7 +27,7 @@ def build_classifier(cfg) -> SklearnClassifier | XGBoostClassifier:
     else:
         raise ValueError(f"Unknown classifier type: {t}")
     
-def build_regressor(cfg) -> SklearnRegressor | XGBoostRegressor:
+def build_regressor(cfg) -> SklearnRegressor | XGBoostRegressor | ClosedFormLinear:
     t = cfg.type.lower()
     params = cfg.parameters or {}
 
@@ -48,5 +49,8 @@ def build_regressor(cfg) -> SklearnRegressor | XGBoostRegressor:
     elif t == "xgboost":
         model = XGBRegressor(**params)
         return XGBoostRegressor(model)
+    elif t == "solve_linear":
+        model = ClosedFormLinear(**params)
+        return model
     else:
         raise ValueError(f"Unknown regressor type: {t}")

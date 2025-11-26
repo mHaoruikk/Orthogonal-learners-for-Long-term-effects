@@ -9,6 +9,7 @@ class Rlearner:
     def __init__(self, model_cfg):
         self.model_cfg = model_cfg
         lambda_type = model_cfg.get('lambda_type', 'identity')
+        self.cate_regressor_cfg = model_cfg.cate_regressor
         if lambda_type == "overlap":
             self.lambda_pi = lambda pi: pi * (1 - pi)
             self.rho_A_pi = lambda A, pi: (A - pi) ** 2
@@ -30,12 +31,15 @@ class Rlearner:
     def fit(self, data: TwoSampleDataSplit):
         cf_nuis = self.nuisance_factory.crossfit_nuisance(data)
         X_e, A_e, S_e = data.X_e, data.A_e, data.S_e
+        X_o, S_o, Y_o = data.X_o, data.S_o, data.Y_o
         K = self.model_cfg.num_crossfit
 
         #For simplicity, we can use a single global cate_regressor trained on all E-sample,
         #but with pseudo-outcomes built using *out-of-fold* nuisances.
 
-        pseudo_outcomes = 
+        pi_x_e = np.empty_like(A_e, dtype = float)
+        pseudo_outcome_e = np.empty_like(S_e, dtype = float)
+        pseudo_outcome_o = np.empty_like(Y_o, dtype = float)
 
         for k in range(K):
             nm_k = cf_nuis.folds[k]
@@ -48,12 +52,14 @@ class Rlearner:
             mu_0_pred = nm_k.mu_0.predict(X_e_k)
             mu_1_pred = nm_k.mu_1.predict(X_e_k)
             h_pred = nm_k.h.predict(np.column_stack([S_e_k, X_e_k]))
-            pi_x_pred = nm_k.pi_x(X_e_k)
+            pi_x_pred = nm_k.pi_x.predict(X_e_k)
+            pi_x_e[idx_k] = pi_x_pred
             #truncate pi to avoid division by zero
             pi_x_pred = np.clip(pi_x_pred, 1e-3, 1 - 1e-3)
             Delta_k = A_e_k / pi_x_pred * (h_pred - mu_1_pred) - \
                         (1 - A_e_k) / (1 - pi_x_pred) * (h_pred - mu_0_pred)
             phi_k = mu_1_pred - mu_0_pred + self.lambda_pi(pi_x_pred) / self.rho_A_pi(A_e_k, pi_x_pred) * Delta_k
+            pseudo_outcome_e[idx_k] = phi_k
 
             #Build pseudo-outcome \psi_lambda^1(Z_i)
             #\psi_\lambda^1(Z;\eta)=\lambda(\pi(X)) \kappa(S,X) (Y-h(S,X))
@@ -69,28 +75,18 @@ class Rlearner:
             rho_s_x_o_pred = np.clip(rho_s_x_o_pred, 1e-3, 1 - 1e-3)
             kappa_o = (1 - rho_s_x_o_pred) / rho_s_x_o_pred * (pi_s_x_o_pred - pi_x_o_pred) / (pi_x_o_pred * (1 - pi_x_o_pred))
             psi_o_k = self.lambda_pi(pi_x_o_pred) * kappa_o * (Y_o_k - h_o_pred)
+            pseudo_outcome_o[idx_k_o] = psi_o_k
 
         # ---- cate_regressor: CATE regressor fitted on experimental data + pseudo-outcomes ----
-
-
-
-
-
-
-
-
-        # Build pseudo-outcomes using cross-fitted h
-        Y_tilde = np.empty_like(S_e, dtype=float)
-        for k in range(K):
-            nm_k = cf_nuis.folds[k]
-            idx_k = np.where(cf_nuis.fold_id_e == k)[0]
-            SX_e_k = np.column_stack([S_e[idx_k], X_e[idx_k]])
-            Y_tilde[idx_k] = nm_k.h.predict(SX_e_k)
-
-        # Now T-learner on (X_e, A_e, Y_tilde)
-        reg0.fit(X_e[A_e == 0], Y_tilde[A_e == 0])
-        reg1.fit(X_e[A_e == 1], Y_tilde[A_e == 1])
-
-        self.y0_estimator = reg0
-        self.y1_estimator = reg1
-        return self
+        
+        if self.cate_regressor_cfg.type == "solve_linear":
+            solver = build_regressor(self.cate_regressor_cfg)
+            solver.fit(X_e, X_o, 
+                       rho_e = self.rho_A_pi(A_e, pi_x_e),
+                       phi = pseudo_outcome_e,
+                       psi = pseudo_outcome_o)
+            self.cate_estimator = solver
+            return self
+    
+    def predict_cate(self, X: np.ndarray) -> np.ndarray:
+        return self.cate_estimator.predict(X)

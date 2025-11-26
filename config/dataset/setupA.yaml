@@ -3,8 +3,8 @@ type: synthetic_surrogate
 propensity_E: "sin"   #["sin", "tanh", "exp"]
 propensity_O: 'exp'
 dim_x: 10
-n_e: 2000
-n_o: 5000
+n_e: 20000
+n_o: 50000
 sigma_s: 0.2
 sigma_y: 0.5
 seed: 0

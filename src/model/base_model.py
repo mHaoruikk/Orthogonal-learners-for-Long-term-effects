@@ -16,6 +16,9 @@ class BaseEstimator(ABC):
     def predict(self, X:np.ndarray, **kargs):
         ...
 
+    def __call__(self, X:np.ndarray, **kargs):
+        return self.predict(X, **kargs)
+
 class SklearnRegressor(BaseEstimator):
     """
     Wrapper for sklearn regressors
@@ -114,7 +117,10 @@ class ClosedFormLinear:
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         f_X = self.f(X) 
-        return f_X @ self.theta_                                          
+        return f_X @ self.theta_
+
+    def __call__(self, X: np.ndarray) -> np.ndarray:
+        return self.predict(X)
 
 
 #Implement a single layer torch neural network (which is basically linear regression)

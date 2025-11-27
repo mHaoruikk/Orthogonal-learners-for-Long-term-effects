@@ -1,0 +1,57 @@
+[2025-11-27 10:43:28,548][__main__][INFO] - Loaded configuration:
+dataset:
+  name: setupA
+  type: synthetic_surrogate
+  propensity_E: sin
+  propensity_O: exp
+  dim_x: 10
+  n_e: 20000
+  n_o: 50000
+  sigma_s: 0.2
+  sigma_y: 0.5
+  seed: 0
+model:
+  name: t_learner
+  backend: sklearn
+  lambda_type: none
+  num_crossfit: 3
+  nuisances:
+    h:
+      type: xgboost
+      crossfit: false
+      parameters:
+        n_estimators: 100
+        max_depth: 5
+        learning_rate: 0.1
+        subsample: 0.8
+        colsample_bytree: 0.8
+    mu_0:
+      type: lasso
+      parameters:
+        fit_intercept: false
+    mu_1:
+      type: lasso
+      parameters:
+        fit_intercept: false
+  cate_regressor:
+    type: xgboost
+    parameters:
+      n_estimators: 200
+      max_depth: 5
+      learning_rate: 0.05
+      subsample: 0.8
+      colsample_bytree: 0.8
+trainer:
+  max_epochs: 1
+  eval_on: test
+  metrics:
+  - cate_mse
+  save_predictions: true
+seed: 2025
+val_fraction: 0.15
+test_fraction: 0.15
+
+[2025-11-27 10:43:28,549][__main__][INFO] - Starting dataset simulation
+[2025-11-27 10:43:28,549][src.utils][INFO] - Sampling dataset with configuration 'setupA'
+[2025-11-27 10:43:28,560][__main__][INFO] - Training R-learner and associated nuisances
+[2025-11-27 10:43:28,562][__main__][INFO] - Initializing R-learner model and building nuisance models

@@ -50,11 +50,11 @@ nuisances:
       subsample: 0.8
       colsample_bytree: 0.8
   mu_0: 
-    type: lasso # lasso, ridge, elasticnet, linear
+    type: xgboost # lasso, ridge, elasticnet, linear
     parameters:
       fit_intercept: False
   mu_1: 
-    type: lasso # lasso, ridge, elasticnet, linear
+    type: xgboost # lasso, ridge, elasticnet, linear
     parameters:
       fit_intercept: False
 
@@ -62,7 +62,7 @@ cate_regressor:
   type: solve_linear
   parameters:
     feature_type: linear      #[linear,]
-    fit_intercept: false
-    regularization: 1e-3
+    fit_intercept: true
+    regularization: 1e-6
 
   

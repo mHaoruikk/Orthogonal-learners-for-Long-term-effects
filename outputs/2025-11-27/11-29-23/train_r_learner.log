@@ -1,0 +1,93 @@
+[2025-11-27 11:29:23,318][__main__][INFO] - Loaded configuration:
+dataset:
+  name: setupA
+  type: synthetic_surrogate
+  propensity_E: sin
+  propensity_O: exp
+  dim_x: 10
+  n_e: 20000
+  n_o: 50000
+  sigma_s: 0.2
+  sigma_y: 0.5
+  seed: 0
+model:
+  name: t_learner
+  backend: sklearn
+  lambda_type: overlap
+  num_crossfit: 3
+  nuisances:
+    pi_x:
+      type: logistic
+      parameters:
+        penalty: l2
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    pi_s_x:
+      type: logistic
+      parameters:
+        penalty: elasticnet
+        l1_ratio: 0.5
+        solver: saga
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    rho_x:
+      type: logistic
+      parameters:
+        penalty: elasticnet
+        l1_ratio: 0.5
+        solver: saga
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    rho_s_x:
+      type: logistic
+      parameters:
+        penalty: elasticnet
+        l1_ratio: 0.5
+        solver: saga
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    h:
+      type: xgboost
+      crossfit: true
+      parameters:
+        n_estimators: 100
+        max_depth: 5
+        learning_rate: 0.1
+        subsample: 0.8
+        colsample_bytree: 0.8
+    mu_0:
+      type: xgboost
+      parameters:
+        fit_intercept: false
+    mu_1:
+      type: xgboost
+      parameters:
+        fit_intercept: false
+  cate_regressor:
+    type: solve_linear
+    parameters:
+      feature_type: linear
+      fit_intercept: true
+      regularization: 1.0e-06
+trainer:
+  max_epochs: 1
+  eval_on: test
+  metrics:
+  - cate_mse
+  save_predictions: true
+seed: 2025
+val_fraction: 0.15
+test_fraction: 0.15
+
+[2025-11-27 11:29:23,319][__main__][INFO] - Starting dataset simulation
+[2025-11-27 11:29:23,319][src.utils][INFO] - Sampling dataset with configuration 'setupA'
+[2025-11-27 11:29:23,339][__main__][INFO] - Training R-learner and associated nuisances
+[2025-11-27 11:29:23,340][__main__][INFO] - Initializing R-learner model and building nuisance models
+[2025-11-27 11:29:27,290][__main__][INFO] - Evaluating model performance using mean squared error
+[2025-11-27 11:29:27,306][src.utils][INFO] - Predicting CATE on experimental covariates
+[2025-11-27 11:29:27,306][src.utils][INFO] - Computed CATE MSE: 0.001864
+[2025-11-27 11:29:27,307][__main__][INFO] - Final metrics: {'cate_mse': 0.0018639276280544106}

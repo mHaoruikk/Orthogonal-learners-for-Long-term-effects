@@ -20,8 +20,8 @@ class Rlearner:
             self.lambda_pi = lambda pi: 1 - pi
             self.rho_A_pi = lambda A, pi: 1 - A
         elif lambda_type == "identity":
-            self.lambda_pi = lambda pi: 1.0
-            self.rho_A_pi = lambda A, pi: 1.0
+            self.lambda_pi = lambda pi: np.ones_like(pi)
+            self.rho_A_pi = lambda A, pi: np.ones_like(A)
         else:
             raise NotImplementedError(f"Unknown lambda_type: {lambda_type}")
 

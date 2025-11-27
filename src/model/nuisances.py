@@ -167,7 +167,7 @@ class NuisanceFactory:
                 idx0 = idx_e[A_e[idx_e] == 0]
                 if idx0.size > 0:
                     mu0_est = build_regressor(mu_cfg_0)
-                    mu0_est.fit(X_e[idx0], h_hat_e_train[A_e[idx_e] == 0])
+                    mu0_est.fit(X_e[idx0], h_hat_e_train[idx0])
                     nm.mu_0 = mu0_est
                 else:
                     raise ValueError("No training samples with A=0 in {k}-th fold")
@@ -177,7 +177,7 @@ class NuisanceFactory:
                 idx1 = idx_e[A_e[idx_e] == 1]
                 if idx1.size > 0:
                     mu1_est = build_regressor(mu_cfg_1)
-                    mu1_est.fit(X_e[idx1], h_hat_e_train[A_e[idx_e] == 1])
+                    mu1_est.fit(X_e[idx1], h_hat_e_train[idx1])
                     nm.mu_1 = mu1_est
                 else:
                     raise ValueError("No training samples with A=1 in {k}-th fold")

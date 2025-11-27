@@ -1,0 +1,83 @@
+dataset:
+  name: setupA
+  type: synthetic_surrogate
+  propensity_E: sin
+  propensity_O: exp
+  dim_x: 10
+  n_e: 20000
+  n_o: 50000
+  sigma_s: 0.2
+  sigma_y: 0.5
+  seed: 0
+model:
+  name: t_learner
+  backend: sklearn
+  lambda_type: overlap
+  num_crossfit: 3
+  nuisances:
+    pi_x:
+      type: logistic
+      parameters:
+        penalty: l2
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    pi_s_x:
+      type: logistic
+      parameters:
+        penalty: elasticnet
+        l1_ratio: 0.5
+        solver: saga
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    rho_x:
+      type: logistic
+      parameters:
+        penalty: elasticnet
+        l1_ratio: 0.5
+        solver: saga
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    rho_s_x:
+      type: logistic
+      parameters:
+        penalty: elasticnet
+        l1_ratio: 0.5
+        solver: saga
+        C: 1.0
+        tol: 0.0001
+        fit_intercept: true
+    h:
+      type: xgboost
+      crossfit: true
+      parameters:
+        n_estimators: 100
+        max_depth: 5
+        learning_rate: 0.1
+        subsample: 0.8
+        colsample_bytree: 0.8
+    mu_0:
+      type: lasso
+      parameters:
+        fit_intercept: false
+    mu_1:
+      type: lasso
+      parameters:
+        fit_intercept: false
+  cate_regressor:
+    type: solve_linear
+    parameters:
+      feature_type: linear
+      fit_intercept: false
+      regularization: 0.001
+trainer:
+  max_epochs: 1
+  eval_on: test
+  metrics:
+  - cate_mse
+  save_predictions: true
+seed: 2025
+val_fraction: 0.15
+test_fraction: 0.15

@@ -7,12 +7,6 @@ def plot_cate_predictions(X:np.ndarray, true_cate:np.ndarray, pred_cate:np.ndarr
                           title:str="CATE Predictions"):
     """
     Plots true vs predicted CATE values against the aggregated pre-treatment covariates specified by groupby.
-
-    Parameters:
-    - X: Covariate matrix (n_samples x n_features)
-    - true_cate: True CATE values
-    - pred_cate: Predicted CATE values
-    - title: Title of the plot
     """
     plt.figure(figsize=(8, 6))
     if groupby == "X1+X2+X3+X4":

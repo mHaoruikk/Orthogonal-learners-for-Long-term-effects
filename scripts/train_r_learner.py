@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 from src.data.base_dataset import TwoSampleDataSplit, GroundTruth
 from src.data.synthetic import NieWagerSyntheticDataset
 from src.data.utils import split_two_sample_data
-from src.model.r_learner import Rlearner
+from src.model.r_learner import tRlearner
 from src.utils import simulate_dataset, evaluate_mse
 from src.visualization import plot_cate_predictions
 
@@ -16,10 +16,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def train_r_learner(cfg: DictConfig, data: TwoSampleDataSplit) -> Rlearner:
-    """Train the R-learner along with its nuisance models."""
-    logger.info("Initializing R-learner model and building nuisance models")
-    learner = Rlearner(cfg.model)
+def train_t_r_learner(cfg: DictConfig, data: TwoSampleDataSplit) -> tRlearner:
+    """Train the t-R-learner along with its nuisance models."""
+    logger.info("Initializing t-R-learner model and building nuisance models")
+    learner = tRlearner(cfg.model)
     learner.fit(data)
     return learner
 
@@ -34,8 +34,8 @@ def main(args: DictConfig):
     test_fraction = args.trainer.get('test_fraction', 0.2)
     train_data, val_data, test_data = split_two_sample_data(data, val_fraction, test_fraction)
 
-    logger.info("Training R-learner and associated nuisances")
-    learner = train_r_learner(args, train_data)
+    logger.info("Training t-R-learner and associated nuisances")
+    learner = train_t_r_learner(args, train_data)
     
     X_test = test_data.X_e
     true_cate = ground_truth.tau(X_test)

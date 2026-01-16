@@ -1,8 +1,7 @@
 # conf/model/overlap_orth.yaml
-name: t_learner
+name: DualOverlapWeightedOrthogonalLearner
 backend: sklearn            
 lambda_type: overlap
-r_type: proportional # proportional stands for r(\rho) = \rho, identity stands for r(\rho) = 1
 num_crossfit: 3
 
 nuisances:
@@ -60,7 +59,7 @@ nuisances:
       fit_intercept: False
 
 cate_regressor:
-  type: solve_linear
+  type: xgboost
   parameters:
     feature_type: linear      #[linear,]
     fit_intercept: true

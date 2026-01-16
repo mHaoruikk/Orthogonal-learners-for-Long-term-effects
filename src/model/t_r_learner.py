@@ -5,7 +5,7 @@ from src.data.base_dataset import TwoSampleDataSplit
 from src.model.nuisances import NuisanceFactory, CrossFittedNuisances
 from src.model.utils import build_regressor
 
-class Rlearner:
+class tRlearner: #t for treatment
     def __init__(self, model_cfg):
         self.model_cfg = model_cfg
         lambda_type = model_cfg.get('lambda_type', 'identity')

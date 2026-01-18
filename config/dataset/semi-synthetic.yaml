@@ -1,0 +1,36 @@
+name: semi-synthetic
+#type: synthetic_surrogate
+real_data_path: r"C:\Users\ma\Research\Long-term-effects\R-learner-LTE\src\data\semi_synthetic_real_data.csv"
+X_cols:
+  - age
+  - gender
+  - randdelay
+  - country
+  - livealone_rand
+  - indepinadl_rand
+  - sbprand
+  - dbprand
+  - weight
+  - glucose
+  - gcs_score_rand
+  - nihss
+  - atrialfib_rand
+  - stroke_pre
+  - hypertension_pre
+  - diabetes_pre
+  - aspirin_pre
+  - other_antiplat_pre
+  - anticoag_pre
+  - stroketype
+  - R_infarct_size
+  - R_hypodensity
+  - R_swelling
+
+propensity_E: "sin"   #["sin", "tanh", "exp"]
+propensity_O: 'exp'
+dim_x: 10
+n_e: 20000
+n_o: 50000
+sigma_s: 0.2
+sigma_y: 0.5
+seed: 0

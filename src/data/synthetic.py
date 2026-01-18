@@ -167,7 +167,9 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
 
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
         X_e = rng.uniform(-1, 1, size=(self.n_e, self.dim_x))
-        X_o = rng.uniform(-1, 1, size=(self.n_o, self.dim_x))
+        #X_o = rng.uniform(-1, 1, size=(self.n_o, self.dim_x))
+        #while obs follows normal distribution
+        X_o = rng.normal(0, 0.5, size=(self.n_o, self.dim_x))
         return X_e, X_o
     
     def pi_E(self, X:np.ndarray) -> np.ndarray:

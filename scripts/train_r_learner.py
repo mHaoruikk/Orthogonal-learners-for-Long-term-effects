@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 from src.data.base_dataset import TwoSampleDataSplit, GroundTruth
 from src.data.synthetic import NieWagerSyntheticDataset
 from src.data.utils import split_two_sample_data
-from src.model.r_learner import tRlearner
+from src.model.t_r_learner import tRlearner
 from src.utils import simulate_dataset, evaluate_mse
 from src.visualization import plot_cate_predictions
 

@@ -23,6 +23,15 @@ class TwoSampleDataSplit:
     Y_o: np.ndarray
 
 @dataclass
+class MixedDataSample:
+    """data class for mixed experimental and observational data."""
+    X: np.ndarray
+    A: np.ndarray
+    S: np.ndarray
+    R: np.ndarray  # R=0 for E, R=1 for O
+    Y: np.ndarray  # Y observed only for R=1
+
+@dataclass
 class GroundTruth:
     """
     Holds ground truth functions for simulations.

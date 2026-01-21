@@ -26,6 +26,14 @@ X_cols:
   - R_hypodensity
   - R_swelling
 
+numerical_cols: [
+  "age", "randdelay", "sbprand", "dbprand", "weight", "glucose",
+  "gcs_score_rand", "nihss",
+  "R_infarct_size","R_hypodensity","R_swelling"
+]
+
+    
+
 propensity_E: "sin"   #["sin", "tanh", "exp"]
 propensity_O: 'exp'
 dim_x: 10

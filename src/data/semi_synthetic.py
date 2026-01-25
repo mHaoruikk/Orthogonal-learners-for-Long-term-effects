@@ -1,9 +1,11 @@
+from zipfile import Path
 from src.data.base_dataset import BaseDataset, TwoSampleDataSplit, GroundTruth, MixedDataSample
 from abc import ABC, abstractmethod
 from typing import Tuple
 import numpy as np
 import logging
 import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,15 +25,19 @@ class BaseSemiSyntheticDataset(BaseDataset):
     def __init__(self, config):
         super().__init__(config)
 
+        self.n_e = None
+        self.n_o = None
         self.sigma_s = config.sigma_s
         self.sigma_y = config.sigma_y
 
+        self.rho_logits_shift = config.get('rho_logits_shift', 0.0)
         self.rho_x = self.create_rho_x()
 
         self.dim_x = config.dim_x
 
-        self.df = self.load_real_data(config.real_data_path)
         self.X_cols = config.X_cols
+        self.df = self.load_real_data(config.real_data_path)
+        
         
         self.X_e, self.X_o = None, None
         self.A_e, self.A_o = None, None
@@ -117,7 +123,13 @@ class BaseSemiSyntheticDataset(BaseDataset):
         rng = np.random.default_rng(self.seed)
 
         # 1. Pre-treatment covariates
-        X_e, X_o = self.sample_covariates(rng)   # (n_e, dim_x), (n_o, dim_x)
+        belonging = self.Sample_belonging(self.X)
+        #if R=1 => observational sample O
+        X_e = self.X[belonging == 0]
+        X_o = self.X[belonging == 1]
+        self.n_e = X_e.shape[0]
+        self.n_o = X_o.shape[0]
+        logging.info(f"Semi-synthetic dataset: n_e = {self.n_e}, n_o = {self.n_o}")
 
         # 2. Treatment in E: A^E | X ~ Ber(pi(X))
         pi_e = self.pi_E(X_e)
@@ -187,6 +199,11 @@ class IST3SemiSyntheticDataset(BaseSemiSyntheticDataset):
     """
 
     def __init__(self, config):
+        self.numerical_cols = [
+            "age", "randdelay", "sbprand", "dbprand", "weight", "glucose",
+            "gcs_score_rand", "nihss",
+            "R_infarct_size","R_hypodensity","R_swelling"
+        ]
         super().__init__(config)
 
         self.x_idx = {c: i for i, c in enumerate(self.X_cols)}
@@ -226,12 +243,13 @@ class IST3SemiSyntheticDataset(BaseSemiSyntheticDataset):
         return (X[:, j] - self.x_mean[j]) / self.x_std[j]
 
     def create_rho_x(self):
+         
         def rho_x(X: np.ndarray) -> np.ndarray:
 
             x_age = self._z(X, "age")
             x_nihss = self._z(X, "nihss")
 
-            logits = 1.2 - 0.25 * x_nihss + 0.10 * x_age
+            logits = 1.2 - 0.25 * x_nihss + 0.10 * x_age + self.rho_logits_shift
             p = self._sigmoid(logits)
 
             return self._trim(p, eta=0.01)
@@ -254,8 +272,8 @@ class IST3SemiSyntheticDataset(BaseSemiSyntheticDataset):
         return 10.0 * self._sigmoid(S_lat)
 
     def squash_Y(self, Y_lat: np.ndarray) -> np.ndarray:
-        # Y in [0,6]
-        return 6.0 * self._sigmoid(Y_lat)
+        # Y in [0,1]
+        return 1.0 * self._sigmoid(Y_lat)
 
     # ---------- latent a^*(X): exp + quadratic ----------
     def a(self, X: np.ndarray) -> np.ndarray:
@@ -417,3 +435,7 @@ class IST3SemiSyntheticDataset(BaseSemiSyntheticDataset):
 
         tau = (Y1 - Y0).reshape(n, M).mean(axis=1)
         return tau
+    
+
+
+    

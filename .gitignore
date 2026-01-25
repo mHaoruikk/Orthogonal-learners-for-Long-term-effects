@@ -4,3 +4,4 @@ __pycache__/
 *$py.class
 *.ipynb
 outputs/
+scripts/commands.txt

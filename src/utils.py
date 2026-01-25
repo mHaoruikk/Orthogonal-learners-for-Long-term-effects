@@ -27,7 +27,7 @@ def evaluate_mse(
     learner, data: TwoSampleDataSplit, ground_truth: GroundTruth
 ) -> float:
     """Compute mean squared error between predicted and true CATE."""
-    logger.info("Predicting CATE on experimental covariates")
+    #logger.info("Predicting CATE on experimental covariates")
     cate_pred = learner.predict_cate(data.X_e)
     cate_true = ground_truth.tau(data.X_e)
     mse = float(np.mean((cate_pred - cate_true) ** 2))

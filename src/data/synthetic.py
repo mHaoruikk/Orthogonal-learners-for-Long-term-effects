@@ -164,6 +164,7 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         super().__init__(config)
         self.propensity_E = config.propensity_E
         self.propensity_O = config.propensity_O
+        self.gamma = config.get("gamma", 0.0)
 
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
         X_e = rng.uniform(-1, 1, size=(self.n_e, self.dim_x))
@@ -176,7 +177,7 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         if self.propensity_E == "sin":
             return self._trim(np.sin(np.pi * (X[:, 0] * X[:, 1] + 1) / 2))
         elif self.propensity_E == "exp":
-            logits = 0.5 * X[:, 0] + 0.5 * X[:, 1]
+            logits = 0.5 * X[:, 0] + 0.5 * X[:, 1] + self.gamma
             pi = 1 / (1 + np.exp(-logits))
             return self._trim(pi)
         else:

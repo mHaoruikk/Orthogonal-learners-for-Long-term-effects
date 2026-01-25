@@ -1,6 +1,6 @@
 name: semi-synthetic
 #type: synthetic_surrogate
-real_data_path: r"C:\Users\ma\Research\Long-term-effects\R-learner-LTE\src\data\semi_synthetic_real_data.csv"
+real_data_path: C:\Users\ma\Research\Long-term-effects\R-learner-LTE\src\data\semi_synthetic_real_data.csv
 X_cols:
   - age
   - gender
@@ -36,9 +36,9 @@ numerical_cols: [
 
 propensity_E: "sin"   #["sin", "tanh", "exp"]
 propensity_O: 'exp'
+rho_logits_shift: -1.0
 dim_x: 10
-n_e: 20000
-n_o: 50000
+N: 50000
 sigma_s: 0.2
 sigma_y: 0.5
 seed: 0

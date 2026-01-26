@@ -1,6 +1,8 @@
 from typing import Tuple
 from src.data.base_dataset import TwoSampleDataSplit
 from sklearn.model_selection import train_test_split
+from pathlib import Path
+from omegaconf import DictConfig, OmegaConf
 
 def split_two_sample_data(
     data: TwoSampleDataSplit,
@@ -94,3 +96,39 @@ def split_two_sample_data(
     )
 
     return train_split, val_split, test_split
+
+
+
+def load_config(
+    dataset: str | None = None,
+    model: str | None = None,
+    trainer: str | None = None,
+    config_root: Path = Path("config"),
+):
+    """
+    Load full config, optionally overriding dataset/model/trainer from config.yaml defaults.
+    """
+    base_cfg = OmegaConf.load(config_root / "config.yaml")
+    defaults = base_cfg.get("defaults", [])
+
+    def _get_default(name: str) -> str | None:
+        for item in defaults:
+            if isinstance(item, dict) and name in item:
+                return item[name]
+        return None
+
+    dataset_name = dataset or _get_default("dataset")
+    model_name = model or _get_default("model")
+    trainer_name = trainer or _get_default("trainer")
+
+    cfg = OmegaConf.create()
+    cfg.dataset = OmegaConf.load(config_root / "dataset" / f"{dataset_name}.yaml")
+    cfg.model = OmegaConf.load(config_root / "model" / f"{model_name}.yaml")
+    cfg.trainer = OmegaConf.load(config_root / "trainer" / f"{trainer_name}.yaml")
+
+    # copy other top-level fields (e.g. seed)
+    for key, value in base_cfg.items():
+        if key != "defaults":
+            cfg[key] = value
+
+    return cfg

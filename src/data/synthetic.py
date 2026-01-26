@@ -209,6 +209,12 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
     def tau_Y(self, X: np.ndarray) -> np.ndarray:
         return np.zeros(X.shape[0])  
 
+    def true_h(self, S: np.ndarray, X: np.ndarray) -> np.ndarray:
+        """
+        Ground-truth h(S, X) = E[Y | S, X, R=1] under the data-generating process.
+        """
+        return self.b(X, S) + (self.e_O(X) - 0.5) * self.tau_Y(X)
+
     def true_cate(self, X: np.ndarray) -> np.ndarray:
         return self.tau_S(X)  
     

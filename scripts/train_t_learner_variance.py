@@ -35,6 +35,17 @@ def _train_single(cfg: DictConfig, eval_X: np.ndarray, seed: int) -> Tuple[np.nd
     learner = TLearner(cfg_seeded.model)
     learner.fit(train_data)
 
+    if test_data.X_e.shape[0] > 0:
+        cf_nuis = learner.nuisance_factory.crossfit_nuisance(train_data)
+        pi_pred_folds = [nm.pi_x.predict(test_data.X_e) for nm in cf_nuis.folds]
+        rho_pred_folds = [nm.rho_x.predict(test_data.X_e) for nm in cf_nuis.folds]
+        pi_mean = np.mean(np.stack(pi_pred_folds, axis=0), axis=0)
+        rho_mean = np.mean(np.stack(rho_pred_folds, axis=0), axis=0)
+        overlap = pi_mean * (1.0 - pi_mean) * rho_mean
+        avg_overlap = float(np.mean(overlap))
+    else:
+        avg_overlap = float("nan")
+
     preds = learner.predict_cate(eval_X)
     mse = evaluate_mse(learner, test_data, ground_truth)
     return preds, mse

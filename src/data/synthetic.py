@@ -19,8 +19,13 @@ class BaseSyntheticDataset(BaseDataset):
     """
     def __init__(self, config):
         super().__init__(config)
-        self.n_e = config.n_e
-        self.n_o = config.n_o
+        self.n_e = getattr(config, 'n_e', None)
+        self.n_o = getattr(config, 'n_o', None)
+        if self.n_e is None or self.n_o is None:
+            self.n = getattr(config, 'n', 1000)
+        else:
+            self.n = self.n_e + self.n_o
+        
         self.sigma_s = config.sigma_s
         self.sigma_y = config.sigma_y
 
@@ -98,17 +103,14 @@ class BaseSyntheticDataset(BaseDataset):
         """
         rng = np.random.default_rng(self.seed)
 
-        # 1. Pre-treatment covariates
-        X_e, X_o = self.sample_covariates(rng)   # (n_e, dim_x), (n_o, dim_x)
+        X_e, X_o = self.sample_covariates(rng)
 
-        # 2. Treatment in E: A^E | X ~ Ber(pi(X))
         pi_e = self.pi_E(X_e)
         A_e = rng.binomial(n=1, p=pi_e, size=self.n_e)
 
-        # 3. Implicit treatment in O: A^O | X ~ Ber(e(X))
         e_o = self.e_O(X_o)
         A_o = rng.binomial(n=1, p=e_o, size=self.n_o)
-        # 4. Short-term outcome S
+
         a_e = self.a(X_e)
         a_o = self.a(X_o)
         tau_S_e = self.tau_S(X_e)
@@ -120,13 +122,11 @@ class BaseSyntheticDataset(BaseDataset):
         S_e = a_e + (A_e - 0.5) * tau_S_e + delta_e
         S_o = a_o + (A_o - 0.5) * tau_S_o + delta_o
 
-        # 5. Long-term outcome in O
         tau_Y_o = self.tau_Y(X_o)
         eps_o = rng.normal(loc=0.0, scale=self.sigma_y, size=self.n_o)
         b_o = self.b(X_o, S_o)
         Y_o = b_o + (A_o - 0.5) * tau_Y_o + eps_o
 
-        # Long-term outcome in E (not observed)
         tau_Y_e = self.tau_Y(X_e)
         eps_e = rng.normal(loc=0.0, scale=self.sigma_y, size=self.n_e)
         b_e = self.b(X_e, S_e)
@@ -164,13 +164,22 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         super().__init__(config)
         self.propensity_E = config.propensity_E
         self.propensity_O = config.propensity_O
+        self.rho = config.get("rho", None)
         self.gamma = config.get("gamma", 0.0)
+        self.gamma_rho = config.get("gamma_rho", 0.0)
 
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
-        X_e = rng.uniform(-1, 1, size=(self.n_e, self.dim_x))
-        #X_o = rng.uniform(-1, 1, size=(self.n_o, self.dim_x))
-        #while obs follows normal distribution
-        X_o = rng.normal(0, 0.5, size=(self.n_o, self.dim_x))
+        
+        if self.rho == None:
+            X_e = rng.uniform(-1, 1, size=(self.n_e, self.dim_x))
+            X_o = rng.normal(0, 0.5, size=(self.n_o, self.dim_x))
+        else:
+            X = np.uniform(-1, 1, size=(self.n, self.dim_x))
+            R = rng.binomial(n=1, p=self.rho_x(X), size = X.shape[0])
+            X_e = X[R == 0]
+            X_o = X[R == 1]
+            self.n_e = X_e.shape[0]
+            self.n_o = X_o.shape[0]
         return X_e, X_o
     
     def pi_E(self, X:np.ndarray) -> np.ndarray:
@@ -183,6 +192,14 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         else:
             raise NotImplementedError(f"Unknown propensity_E: {self.propensity_E}")
         
+    def rho_x(self, X: np.ndarray) -> np.ndarray:
+        if self.rho == "exp":
+            logits = X[:, 0] - X[:, 1] - self.gamma_rho
+            rho = 1 / (1 + np.exp(-logits))
+            return self._trim(rho)
+        else:
+            raise NotImplementedError(f"Unknown rho: {self.rho}")
+
     def e_O(self, X:np.ndarray) -> np.ndarray:
         if self.propensity_O == "exp":
             logits = 0.5 * X[:, 0] - 0.5 * X[:, 1]

@@ -2,6 +2,7 @@ name: setupA
 type: synthetic_surrogate
 propensity_E: "sin"   #["sin", "tanh", "exp"]
 propensity_O: 'exp'
+rho: 'exp'
 gamma: 0.0 #overlap score
 dim_x: 10
 n_e: 1000

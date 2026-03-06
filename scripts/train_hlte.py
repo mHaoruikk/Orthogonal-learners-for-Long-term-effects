@@ -12,6 +12,10 @@ from src.model.dowol import DualOverlapWeightedOrthogonalLearner
 from src.utils import simulate_dataset, evaluate_mse
 from src.visualization import plot_cate_predictions
 
+#no warnings
+import warnings
+warnings.filterwarnings("ignore")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -51,4 +55,4 @@ if __name__ == "__main__":
     main()
 
     # commands to run
-    # python -m scripts.train_r_learner dataset=setupA model=R-learner trainer=default
+    # python -m scripts.train_hlte dataset=setupA model=HLTE-learner trainer=default

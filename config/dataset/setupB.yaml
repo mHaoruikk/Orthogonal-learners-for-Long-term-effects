@@ -2,10 +2,12 @@
 name: setupB
 type: synthetic_surrogate
 dim_x: 10
-n_e: 2000
-n_o: 5000
+n: 3000
 sigma_s: 0.2
 sigma_y: 0.5
-propensity_E: "tanh"   #["sin", "tanh", "exp"]
+rho: "exp"
+gamma: 0.1
+gamma_rho: 1.0
+propensity_E: "exp"   #["sin", "tanh", "exp"]
 propensity_O: 'exp'
 seed: 0

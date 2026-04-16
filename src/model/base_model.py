@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 
 class BaseEstimator(ABC):
     """
@@ -130,27 +131,117 @@ class TorchLinearModel(nn.Module):
         self.linear = nn.Linear(input_dim, 1)
 
     def forward(self, x):
-        return self.linear(x).squeeze()  # Squeeze to get shape (N,)
+        return self.linear(x).squeeze(-1)  # (N,)
+
+
+class TorchMLP(nn.Module):
+    def __init__(self, input_dim: int, hidden_layers, output_activation: str | None = None):
+        super().__init__()
+        if hidden_layers is None:
+            raise ValueError("hidden_layers must be provided when building an MLP.")
+
+        layers = []
+        prev_dim = input_dim
+        for width in hidden_layers:
+            layers.append(nn.Linear(prev_dim, width))
+            layers.append(nn.ReLU())
+            prev_dim = width
+        layers.append(nn.Linear(prev_dim, 1))
+
+        if output_activation is None or output_activation == "identity":
+            pass
+        elif output_activation == "sigmoid":
+            layers.append(nn.Sigmoid())
+        else:
+            raise ValueError(f"Unknown output_activation: {output_activation}")
+
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x).squeeze(-1)
 
 
 class TorchRegressor(BaseEstimator):
-    def __init__(self, net: nn.Module, optimizer_ctor, loss_fn, epochs: int = 100, batch_size: int = 128, device="cpu"):
-        self.net = net
+    def __init__(
+        self,
+        input_dim: int | None = None,
+        hidden_layers = None,
+        output_activation: str | None = None,
+        net: nn.Module | None = None,
+        optimizer_ctor = torch.optim.Adam,
+        loss_fn: nn.Module | None = None,
+        epochs: int = 20,
+        batch_size: int = 64,
+        lr: float = 1e-3,
+        device: str | torch.device | None = None,
+    ):
+        if net is None:
+            if input_dim is None:
+                raise ValueError("input_dim must be provided when net is None.")
+            self.net = TorchMLP(input_dim=input_dim, hidden_layers=hidden_layers, output_activation=output_activation)
+        else:
+            self.net = net
+
         self.optimizer_ctor = optimizer_ctor
-        self.loss_fn = loss_fn
         self.epochs = epochs
         self.batch_size = batch_size
-        self.device = device
+        self.lr = lr
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+        if loss_fn is None:
+            if output_activation == "sigmoid":
+                self.loss_fn = nn.BCELoss(reduction="none")
+            else:
+                self.loss_fn = nn.MSELoss(reduction="none")
+        else:
+            self.loss_fn = loss_fn
 
     def fit(self, X, y, sample_weight=None):
         # move tensors, run SGD loop
-        ...
+        self.net.to(self.device)
+        self.net.train()
+
+        X_tensor = torch.as_tensor(X, dtype=torch.float32, device=self.device)
+        y_tensor = torch.as_tensor(y, dtype=torch.float32, device=self.device).view(-1)
+
+        if sample_weight is not None:
+            w_tensor = torch.as_tensor(sample_weight, dtype=torch.float32, device=self.device).view(-1)
+            dataset = TensorDataset(X_tensor, y_tensor, w_tensor)
+        else:
+            dataset = TensorDataset(X_tensor, y_tensor)
+
+        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        optimizer = self.optimizer_ctor(self.net.parameters(), lr=self.lr)
+
+        for _ in range(self.epochs):
+            for batch in loader:
+                optimizer.zero_grad()
+                if sample_weight is None:
+                    xb, yb = batch
+                    wb = None
+                else:
+                    xb, yb, wb = batch
+                preds = self.net(xb).view(-1)
+                loss = self._compute_loss(preds, yb, wb)
+                loss.backward()
+                optimizer.step()
         return self
 
     def predict(self, X):
         # eval mode forward pass
         self.net.eval()
-        ...
+        X_tensor = torch.as_tensor(X, dtype=torch.float32, device=self.device)
+        with torch.no_grad():
+            preds = self.net(X_tensor).view(-1)
+        return preds.cpu().numpy()
+
+    def _compute_loss(self, preds, targets, weights):
+        losses = self.loss_fn(preds, targets)
+        if weights is None:
+            return losses.mean() if losses.dim() > 0 else losses
+        if losses.dim() == 0:
+            raise ValueError("sample_weight requires loss_fn with reduction='none'.")
+        return (losses.view(-1) * weights).mean()
 
     
 

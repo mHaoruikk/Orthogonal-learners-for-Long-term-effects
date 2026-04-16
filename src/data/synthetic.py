@@ -162,51 +162,50 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
     """
     def __init__(self, config):
         super().__init__(config)
-        self.propensity_E = config.propensity_E
-        self.propensity_O = config.propensity_O
-        self.rho = config.get("rho", None)
-        self.gamma = config.get("gamma", 0.0)
-        self.gamma_rho = config.get("gamma_rho", 0.0)
+        self.gamma = config.get("gamma", 0.0)          # treatment overlap difficulty (γ_π)
+        self.gamma_rho = config.get("gamma_rho", 0.0)  # long-term outcome overlap difficulty (γ_ρ)
+        self.eta_pi = config.get("eta_pi", 0.05)       # lower/upper bound for π: π ∈ (η_π, 1−η_π)
+        self.eta_rho = config.get("eta_rho", 0.01)     # lower bound for ρ: ρ ∈ (η_ρ, 1)
 
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
-        
-        if self.rho == None:
-            X_e = rng.uniform(-1, 1, size=(self.n_e, self.dim_x))
-            X_o = rng.normal(0, 0.5, size=(self.n_o, self.dim_x))
-        else:
-            X = np.uniform(-1, 1, size=(self.n, self.dim_x))
-            R = rng.binomial(n=1, p=self.rho_x(X), size = X.shape[0])
-            X_e = X[R == 0]
-            X_o = X[R == 1]
-            self.n_e = X_e.shape[0]
-            self.n_o = X_o.shape[0]
+        # Always draw from a single uniform pool and split by R ~ Ber(rho(X)).
+        # X ~ Unif([-1,1]^dim_x) per spec.
+        X = rng.uniform(-1, 1, size=(self.n, self.dim_x))
+        R = rng.binomial(n=1, p=self.rho_x(X), size=X.shape[0])
+        X_e = X[R == 0]
+        X_o = X[R == 1]
+        self.n_e = X_e.shape[0]
+        self.n_o = X_o.shape[0]
         return X_e, X_o
     
-    def pi_E(self, X:np.ndarray) -> np.ndarray:
-        if self.propensity_E == "sin":
-            return self._trim(np.sin(np.pi * (X[:, 0] * X[:, 1] + 1) / 2))
-        elif self.propensity_E == "exp":
-            logits = 0.5 * X[:, 0] + 0.5 * X[:, 1] + self.gamma
-            pi = 1 / (1 + np.exp(-logits))
-            return self._trim(pi)
-        else:
-            raise NotImplementedError(f"Unknown propensity_E: {self.propensity_E}")
+    # Analytical moments of h(X) = X0·X1 + X2 + X3 + X7²  with X ~ Unif(-1,1):
+    #   E[h]   = 0 + 0 + 0 + 1/3  = 1/3
+    #   Var[h] = 1/9 + 1/3 + 1/3 + 4/45  = 13/15
+    _H_MEAN = 1.0 / 3.0
+    _H_STD  = (13.0 / 15.0) ** 0.5   # ≈ 0.9309
+
+    def pi_E(self, X: np.ndarray) -> np.ndarray:
+        # Option A — standardised Nie-Wager feature map (zero-mean, unit-variance logit).
+        # π(X) = η_π + (1 − 2η_π) · σ(γ_π · Z(X))
+        # Z(X) = (X0·X1 + X2 + X3 + X7² − 1/3) / √(13/15)  ≈ N(0,1) by CLT
+        # Analytical boundary mass: P(π within 0.1 of bound) ≈ 2·Φ(−2.20/γ_π)
+        #   → γ_π ≈ 2 gives ~28%, γ_π ≈ 3 gives ~47%
+        h = X[:, 0] * X[:, 1] + X[:, 2] + X[:, 3] + X[:, 7] ** 2
+        logits = self.gamma * (h - self._H_MEAN) / self._H_STD
+        return self.eta_pi + (1 - 2 * self.eta_pi) / (1 + np.exp(-logits))
         
     def rho_x(self, X: np.ndarray) -> np.ndarray:
-        if self.rho == "exp":
-            logits = X[:, 0] - X[:, 1] - self.gamma_rho
-            rho = 1 / (1 + np.exp(-logits))
-            return self._trim(rho)
-        else:
-            raise NotImplementedError(f"Unknown rho: {self.rho}")
+        # Smooth lower-bounded propensity: ρ(X) = η_ρ + (1 − η_ρ)·σ(X0 + X1 + γ_ρ)
+        # Maps smoothly to (η_ρ, 1); larger γ_ρ → more units in observational sample (R=1),
+        # i.e., sparser experimental coverage → worse long-term overlap.
+        logits = X[:, 0] + X[:, 1] - self.gamma_rho
+        return self.eta_rho + (1 - self.eta_rho) / (1 + np.exp(-logits))
 
     def e_O(self, X:np.ndarray) -> np.ndarray:
-        if self.propensity_O == "exp":
-            logits = 0.5 * X[:, 0] - 0.5 * X[:, 1]
-            e = 1 / (1 + np.exp(-logits))
-            return self._trim(e)
-        else:
-            raise NotImplementedError(f"Unknown propensity_O: {self.propensity_O}")
+        # Spec: trim_{0.1}(sigma(X1 + X2 + X3))  (1-indexed → 0-indexed: X[:,1]+X[:,2]+X[:,3])
+        logits = X[:, 1] + X[:, 2] + X[:, 3]
+        e = 1 / (1 + np.exp(-logits))
+        return self._trim(e)
         
     def a(self, X: np.ndarray) -> np.ndarray:
         return (
@@ -221,7 +220,8 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         return 0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3]) + 1
 
     def b(self, X: np.ndarray, S: np.ndarray) -> np.ndarray:
-        return X[:, 6] ** 2 + X[:, 7] + S
+        # Spec: sin(X0*X1) + X6^2 + X7 + S  (1-indexed X7,X8 → 0-indexed X[:,6],X[:,7])
+        return np.sin(X[:, 0] * X[:, 1]) + X[:, 6] ** 2 + X[:, 7] + S
 
     def tau_Y(self, X: np.ndarray) -> np.ndarray:
         return np.zeros(X.shape[0])  

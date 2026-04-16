@@ -19,12 +19,10 @@ def _mse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 def main(cfg: DictConfig):
     logger.info("Loaded configuration:\n%s", OmegaConf.to_yaml(cfg))
 
-    # 1) Instantiate dataset and R-learner
     dataset = NieWagerSyntheticDataset(cfg.dataset)
     data, _ = dataset.sample()
     learner = tRlearner(cfg.model)
 
-    # 2) Fit nuisance models (from the R-learner) and evaluate MSE against ground truth
     cf_nuis = learner.nuisance_factory.crossfit_nuisance(data)
     if len(cf_nuis.folds) == 0:
         raise RuntimeError("No nuisance models were produced by cross-fitting.")

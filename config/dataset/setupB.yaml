@@ -1,13 +1,11 @@
-# conf/dataset/setupB.yaml
 name: setupB
 type: synthetic_surrogate
 dim_x: 10
 n: 3000
 sigma_s: 0.2
 sigma_y: 0.5
-rho: "exp"
-gamma: 0.1
-gamma_rho: 1.0
-propensity_E: "exp"   #["sin", "tanh", "exp"]
-propensity_O: 'exp'
+gamma: 3.0       # γ_π: treatment overlap difficulty (higher = worse overlap)
+gamma_rho: 2.0   # γ_ρ: long-term outcome overlap difficulty (higher = sparser experimental)
+eta_pi: 0.05     # lower/upper bound for π: π ∈ (η_π, 1−η_π)
+eta_rho: 0.01    # lower bound for ρ: ρ ∈ (η_ρ, 1)
 seed: 0

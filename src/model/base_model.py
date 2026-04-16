@@ -175,10 +175,19 @@ class TorchRegressor(BaseEstimator):
         lr: float = 1e-3,
         device: str | torch.device | None = None,
     ):
+        if net is None and hidden_layers is None:
+            raise ValueError("hidden_layers must be provided when net is None.")
+
+        self._hidden_layers = hidden_layers
+        self._output_activation = output_activation
+
         if net is None:
-            if input_dim is None:
-                raise ValueError("input_dim must be provided when net is None.")
-            self.net = TorchMLP(input_dim=input_dim, hidden_layers=hidden_layers, output_activation=output_activation)
+            # If input_dim is not known at construction time, we lazily build the MLP in fit().
+            self.net = (
+                TorchMLP(input_dim=input_dim, hidden_layers=hidden_layers, output_activation=output_activation)
+                if input_dim is not None
+                else None
+            )
         else:
             self.net = net
 
@@ -198,14 +207,26 @@ class TorchRegressor(BaseEstimator):
 
     def fit(self, X, y, sample_weight=None):
         # move tensors, run SGD loop
+        if self.net is None:
+            if X is None:
+                raise ValueError("X must be provided to infer input_dim when net is None.")
+            if not hasattr(X, "shape") or len(X.shape) != 2:
+                raise ValueError(f"Expected X to be a 2D array, got shape={getattr(X, 'shape', None)}")
+            self.net = TorchMLP(
+                input_dim=int(X.shape[1]),
+                hidden_layers=self._hidden_layers,
+                output_activation=self._output_activation,
+            )
+
         self.net.to(self.device)
         self.net.train()
 
-        X_tensor = torch.as_tensor(X, dtype=torch.float32, device=self.device)
-        y_tensor = torch.as_tensor(y, dtype=torch.float32, device=self.device).view(-1)
+        # Keep tensors on CPU for DataLoader; move to device per-batch.
+        X_tensor = torch.as_tensor(X, dtype=torch.float32)
+        y_tensor = torch.as_tensor(y, dtype=torch.float32).view(-1)
 
         if sample_weight is not None:
-            w_tensor = torch.as_tensor(sample_weight, dtype=torch.float32, device=self.device).view(-1)
+            w_tensor = torch.as_tensor(sample_weight, dtype=torch.float32).view(-1)
             dataset = TensorDataset(X_tensor, y_tensor, w_tensor)
         else:
             dataset = TensorDataset(X_tensor, y_tensor)
@@ -221,6 +242,9 @@ class TorchRegressor(BaseEstimator):
                     wb = None
                 else:
                     xb, yb, wb = batch
+                xb = xb.to(self.device)
+                yb = yb.to(self.device)
+                wb = wb.to(self.device) if wb is not None else None
                 preds = self.net(xb).view(-1)
                 loss = self._compute_loss(preds, yb, wb)
                 loss.backward()
@@ -229,6 +253,8 @@ class TorchRegressor(BaseEstimator):
 
     def predict(self, X):
         # eval mode forward pass
+        if self.net is None:
+            raise ValueError("Model is not initialized. Call fit() before predict().")
         self.net.eval()
         X_tensor = torch.as_tensor(X, dtype=torch.float32, device=self.device)
         with torch.no_grad():

@@ -1,0 +1,94 @@
+# Neural-network version of R-learner config.
+# Implements the ICML'26 appendix architecture:
+# - Propensity nuisances (rho, rho_s, pi, pi_s): 2 hidden layers (20,10) + sigmoid output
+# - Outcome-related nuisances + stage-2: 4 hidden layers (20,20,10,10) + linear output
+# - Nuisances: 20 epochs, batch 64, lr 1e-3
+# - Stage-2: 40 epochs, batch 128, lr 1e-3
+#
+# Note: This YAML assumes the project is (or will be) wired to support `type: torch_mlp`.
+
+name: r_learner
+backend: torch
+lambda_type: overlap
+r_type: proportional # proportional stands for r(\rho) = \rho, identity stands for r(\rho) = 1
+num_crossfit: 3
+
+nuisances:
+  # ---- propensity / selection nuisances (2-layer MLP + sigmoid) ----
+  pi_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  pi_s_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  rho_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  rho_s_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+
+  # ---- outcome-related nuisances (4-layer MLP, linear output) ----
+  h:
+    type: torch_mlp
+    crossfit: true
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_0:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_1:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+
+cate_regressor:
+  type: torch_mlp
+  parameters:
+    hidden_layers: [20, 20, 10, 10]
+    output_activation: identity
+    epochs: 40
+    batch_size: 128
+    lr: 1e-3
+    device: cpu
+

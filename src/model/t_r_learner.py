@@ -81,12 +81,29 @@ class tRlearner: #t for treatment
         
         if self.cate_regressor_cfg.type == "solve_linear":
             solver = build_regressor(self.cate_regressor_cfg)
-            solver.fit(X_e, X_o, 
-                       rho_e = self.rho_A_pi(A_e, pi_x_e),
-                       phi = pseudo_outcome_e,
-                       psi = pseudo_outcome_o)
+            # Clip pi for stability in weights.
+            pi_x_e_clip = np.clip(pi_x_e, 1e-3, 1 - 1e-3)
+            solver.fit(
+                X_e,
+                X_o,
+                rho_e=self.rho_A_pi(A_e, pi_x_e_clip),
+                phi=pseudo_outcome_e,
+                psi=pseudo_outcome_o,
+            )
             self.cate_estimator = solver
             return self
+
+        # Non-linear stage-2: fit a regressor on combined (X, pseudo_outcome) with E-sample weights rho(A,pi)
+        solver = build_regressor(self.cate_regressor_cfg)
+        X_all = np.vstack([X_e, X_o])
+        y_all = np.concatenate([pseudo_outcome_e, pseudo_outcome_o])
+        pi_x_e_clip = np.clip(pi_x_e, 1e-3, 1 - 1e-3)
+        w_e = self.rho_A_pi(A_e, pi_x_e_clip)
+        w_o = np.ones_like(pseudo_outcome_o, dtype=float)
+        w_all = np.concatenate([w_e, w_o])
+        solver.fit(X_all, y_all, sample_weight=w_all)
+        self.cate_estimator = solver
+        return self
     
     def predict_cate(self, X: np.ndarray) -> np.ndarray:
         return self.cate_estimator.predict(X)

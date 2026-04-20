@@ -1,11 +1,11 @@
-name: setupA
+name: dual-overlap
 type: synthetic_surrogate
 dim_x: 10
-n: 3000
+n: 5000
 sigma_s: 0.2
 sigma_y: 0.5
-gamma: 0.0       # γ_π: treatment overlap difficulty (0 = balanced)
-gamma_rho: 0.1   # γ_ρ: long-term outcome overlap difficulty (0 = balanced)
+gamma: 5.0       # 0 to 10
+gamma_rho: 1.0   # γ_ρ: long-term outcome overlap difficulty (0 = balanced)
 eta_pi: 0.01     # lower/upper bound for π: π ∈ (η_π, 1−η_π)
 eta_rho: 0.001    # lower bound for ρ: ρ ∈ (η_ρ, 1)
 seed: 0

@@ -11,7 +11,7 @@ from sklearn.linear_model import (
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from xgboost import XGBRegressor, XGBClassifier
 
-def build_classifier(cfg) -> SklearnClassifier | XGBoostClassifier:
+def build_classifier(cfg) -> SklearnClassifier | XGBoostClassifier | TorchRegressor:
     t = cfg.type.lower()
     params = cfg.parameters or {}
 

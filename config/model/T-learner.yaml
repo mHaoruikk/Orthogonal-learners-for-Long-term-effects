@@ -32,13 +32,9 @@ nuisances:
 
 
 cate_regressor:
-  type: xgboost
+  type: linear # lasso, ridge, elasticnet, linear
   parameters:
-    n_estimators: 200
-    max_depth: 5
-    learning_rate: 0.05
-    subsample: 0.8
-    colsample_bytree: 0.8
+      fit_intercept: False
 
 
   

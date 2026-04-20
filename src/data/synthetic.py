@@ -19,31 +19,25 @@ class BaseSyntheticDataset(BaseDataset):
     """
     def __init__(self, config):
         super().__init__(config)
-        self.n_e = getattr(config, 'n_e', None)
-        self.n_o = getattr(config, 'n_o', None)
-        if self.n_e is None or self.n_o is None:
-            self.n = getattr(config, 'n', 1000)
-        else:
-            self.n = self.n_e + self.n_o
-        
+        self.n = config.n
+        self.n_e = None  # set by sample_covariates via rho_x
+        self.n_o = None
+
         self.sigma_s = config.sigma_s
         self.sigma_y = config.sigma_y
 
         self.dim_x = config.dim_x
-        
+
         self.X_e, self.X_o = None, None
         self.A_e, self.A_o = None, None
         self.S_e, self.S_o = None, None
         self.Y_e, self.Y_o = None, None
 
     @abstractmethod
-    def sample_covariates(self, ):
-        """Sample covariates X."""
-
-    @abstractmethod
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Sample (X_e, X_o) for experimental and observational datasets.
+        Draw n covariates, split into (X_e, X_o) via R ~ Ber(rho_x(X)).
+        Must set self.n_e and self.n_o.
         """
         ...
 
@@ -233,7 +227,7 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         return self.b(X, S) + (self.e_O(X) - 0.5) * self.tau_Y(X)
 
     def true_cate(self, X: np.ndarray) -> np.ndarray:
-        return self.tau_S(X)  
+        return self.tau_S(X)
     
 
 

@@ -1,0 +1,80 @@
+name: LTO_Learner
+weight_type: dual            # identity | to | lo | dual
+num_crossfit: 3
+
+nuisances:
+  pi_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  pi_s_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+
+  rho_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  rho_s_x:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  h:
+    type: torch_mlp
+    crossfit: true
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_0:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_1:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+
+cate_regressor:
+  type: torch_mlp
+  parameters:
+    hidden_layers: [20, 20, 10, 10]
+    output_activation: identity
+    epochs: 40
+    batch_size: 64
+    lr: 1e-3
+    device: cpu

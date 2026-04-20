@@ -8,3 +8,6 @@ scripts/commands.txt
 .claude/
 notebooks/_rebuild_nb.py
 /notebooks/*.pdf
+.vscode/
+docs/.
+docs/Description-IST3.pdf

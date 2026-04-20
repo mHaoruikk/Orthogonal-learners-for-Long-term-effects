@@ -1,0 +1,52 @@
+name: t_learner
+num_crossfit: 3
+
+nuisances:
+  h:     #config for h(S,X)
+    type: torch_mlp
+    crossfit: false # in t-learner, no need to crossfit h
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_0: #config for \mu(a,x)
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_1: #config for \mu(a,x)
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  pi_x:  #config for estimator \pi(x)
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 10]
+      output_activation: sigmoid
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+
+
+cate_regressor:
+  type: torch_mlp
+  parameters:
+    hidden_layers: [20, 20, 10, 10]
+    output_activation: identity
+    epochs: 40
+    batch_size: 64
+    lr: 1e-3
+    device: cpu

@@ -1,6 +1,3 @@
 # conf/trainer/default.yaml
-max_epochs: 1              # for non-neural models, maybe irrelevant
-eval_on: test    # where to compute MSE (X_e)
-metrics:
-  - cate_mse
-save_predictions: true
+val_fraction: 0.15
+test_fraction: 0.15

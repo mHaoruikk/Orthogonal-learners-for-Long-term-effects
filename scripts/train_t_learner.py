@@ -26,7 +26,7 @@ def train_t_learner(cfg: DictConfig, data: TwoSampleDataSplit) -> TLearner:
 
 @hydra.main(version_base="1.1", config_name="config.yaml", config_path="../config/")
 def main(args: DictConfig):
-    logger.info("Loaded configuration:\n%s", OmegaConf.to_yaml(args))
+    #logger.info("Loaded configuration:\n%s", OmegaConf.to_yaml(args))
 
     logger.info("Starting dataset simulation")
     data, ground_truth = simulate_dataset(args)

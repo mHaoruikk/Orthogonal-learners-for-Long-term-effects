@@ -1,0 +1,42 @@
+name: RA_Learner
+num_crossfit: 3
+
+nuisances:
+  h:
+    type: torch_mlp
+    crossfit: true
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_0:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+  mu_1:
+    type: torch_mlp
+    parameters:
+      hidden_layers: [20, 20, 10, 10]
+      output_activation: identity
+      epochs: 20
+      batch_size: 64
+      lr: 1e-3
+      device: cpu
+
+cate_regressor:
+  type: torch_mlp
+  parameters:
+    hidden_layers: [20, 20, 10, 10]
+    output_activation: identity
+    epochs: 40
+    batch_size: 64
+    lr: 1e-3
+    device: cpu

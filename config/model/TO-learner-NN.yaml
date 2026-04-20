@@ -1,20 +1,8 @@
-# Neural-network version of R-learner config.
-# Implements the ICML'26 appendix architecture:
-# - Propensity nuisances (rho, rho_s, pi, pi_s): 2 hidden layers (20,10) + sigmoid output
-# - Outcome-related nuisances + stage-2: 4 hidden layers (20,20,10,10) + linear output
-# - Nuisances: 20 epochs, batch 64, lr 1e-3
-# - Stage-2: 40 epochs, batch 128, lr 1e-3
-#
-# Note: This YAML assumes the project is (or will be) wired to support `type: torch_mlp`.
-
-name: r_learner
-backend: torch
-lambda_type: overlap
-r_type: proportional # proportional stands for r(\rho) = \rho, identity stands for r(\rho) = 1
+name: LTO_Learner
+weight_type: to            # identity | to | lo | dual
 num_crossfit: 3
 
 nuisances:
-  # ---- propensity / selection nuisances (2-layer MLP + sigmoid) ----
   pi_x:
     type: torch_mlp
     parameters:
@@ -33,6 +21,7 @@ nuisances:
       batch_size: 64
       lr: 1e-3
       device: cpu
+
   rho_x:
     type: torch_mlp
     parameters:
@@ -51,8 +40,6 @@ nuisances:
       batch_size: 64
       lr: 1e-3
       device: cpu
-
-  # ---- outcome-related nuisances (4-layer MLP, linear output) ----
   h:
     type: torch_mlp
     crossfit: true
@@ -88,7 +75,6 @@ cate_regressor:
     hidden_layers: [20, 20, 10, 10]
     output_activation: identity
     epochs: 40
-    batch_size: 128
+    batch_size: 64
     lr: 1e-3
     device: cpu
-

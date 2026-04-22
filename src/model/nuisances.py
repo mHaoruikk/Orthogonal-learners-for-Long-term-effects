@@ -44,15 +44,18 @@ class NuisanceFactory:
         self.model_cfg = model_cfg
         self.K = model_cfg.num_crossfit
 
-    def _make_folds(self, n_e: int, n_o: int, random_state: int = 42) -> tuple[np.ndarray, np.ndarray]:
+    def _make_folds(self, n_e: int, n_o: int) -> tuple[np.ndarray, np.ndarray]:
         """
         Create K-fold assignments for E and O separately.
+        Seed read from `model_cfg.random_state` (default 42) so the caller can
+        thread a fresh seed per replicate.
         Returns:
             fold_id_e: (n_e,) in {0,...,K-1}
             fold_id_o: (n_o,) in {0,...,K-1}
         """
-        kf_e = KFold(n_splits=self.K, shuffle=True, random_state=random_state)
-        kf_o = KFold(n_splits=self.K, shuffle=True, random_state=random_state)
+        rs = int(self.model_cfg.get("random_state", 42))
+        kf_e = KFold(n_splits=self.K, shuffle=True, random_state=rs)
+        kf_o = KFold(n_splits=self.K, shuffle=True, random_state=rs + 1)
 
         fold_id_e = np.empty(n_e, dtype=int)
         fold_id_o = np.empty(n_o, dtype=int)

@@ -87,10 +87,10 @@ $$P_{\text{new}}(A=1 \mid X=x) = \frac{0.5 \cdot \pi^*(x)/\pi_{\max}}{0.5 \cdot 
 
 You need multiple metrics because no single one is trustworthy in the real-data setting. Report all four.
 
-**(i) Doubly-robust pseudo-outcome MSE (primary).** On a held-out 20% test fold, construct the long-term DR pseudo-outcome
-$$\tilde Y_i = \mu_1(X_i) - \mu_0(X_i) + \frac{A_i - \hat\pi(X_i)}{\hat\pi(X_i)(1-\hat\pi(X_i))}\cdot\frac{R_i}{\hat\rho(X_i, A_i, S_i)}\cdot(Y_i - \hat\mu_{A_i}(X_i, S_i))$$
-using nuisance estimates fit on the training fold (cross-fitted). Report
-$$\widehat{\text{PEHE}}_{\text{DR}}(\hat\tau) = \frac{1}{n_{\text{test}}}\sum_i (\hat\tau(X_i) - \tilde Y_i)^2.$$
+**(i) Doubly-robust pseudo-outcome MSE (primary).** On a held-out 25% test fold, construct the long-term pseudo-outcome
+$$\tilde \tau_i^* = \mu_1(X_i) - \mu_0(X_i)$$
+, with $\mu_a(x) = E[Y \mid X=x, A=a]$. Report
+$$\widehat{\text{PEHE}}_{\text{DR}}(\hat\tau) = \frac{1}{n_{\text{test}}}\sum_i (\hat\tau(X_i) - \tilde \tau_i^*)^2.$$
 This is biased for true PEHE (because $\tilde Y$ is noisy), but differences between estimators are approximately unbiased. Use it to rank methods.
 
 **(ii) Subgroup stability across overlap strata (your low-overlap story).** Stratify test patients by deciles of $\hat\pi(x)(1-\hat\pi(x)) \cdot \hat\rho(x)$. Within each stratum, report the bootstrap variance of $\hat\tau(x)$ across 200 bootstrap replicates. Your story — that weighting stabilizes estimates in low-overlap regions — predicts that LT-O-DO should have flatter variance across strata than LT-O-DR. This is a direct visualization of the mechanism you are claiming, and the one most likely to impress reviewer V1cz.

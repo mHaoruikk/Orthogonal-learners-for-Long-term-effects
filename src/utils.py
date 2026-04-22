@@ -7,19 +7,30 @@ from omegaconf import DictConfig, OmegaConf
 from src.data.base_dataset import TwoSampleDataSplit, GroundTruth
 
 from src.data.synthetic import NieWagerSyntheticDataset
+from src.data.semi_synthetic import IST3SemiSyntheticDataset
+from src.data.real_world import RealWorldIST
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def simulate_dataset(cfg: DictConfig) -> Tuple[TwoSampleDataSplit, GroundTruth]:
-    """Simulate a dataset using the configured synthetic setup."""
-    if cfg.dataset.type != "synthetic_surrogate":
-        raise NotImplementedError(
-            f"Unsupported dataset type: {cfg.dataset.type}. Only synthetic_surrogate is available."
-        )
 
+_DATASET_REGISTRY = {
+    "synthetic_surrogate": NieWagerSyntheticDataset,
+    "semi_synthetic_ist": IST3SemiSyntheticDataset,
+    "real_world": RealWorldIST,
+}
+
+
+def simulate_dataset(cfg: DictConfig) -> Tuple[TwoSampleDataSplit, GroundTruth]:
+    """Build a dataset from cfg.dataset.type and return (data, ground_truth)."""
+    cls = _DATASET_REGISTRY.get(cfg.dataset.type)
+    if cls is None:
+        raise NotImplementedError(
+            f"Unsupported dataset type: {cfg.dataset.type}. "
+            f"Known: {sorted(_DATASET_REGISTRY)}"
+        )
     logger.info("Sampling dataset with configuration '%s'", cfg.dataset.name)
-    dataset = NieWagerSyntheticDataset(cfg.dataset)
+    dataset = cls(cfg.dataset)
     return dataset.sample()
 
 

@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset, Subset, random_split
 from sklearn.model_selection import KFold, train_test_split
 from dataclasses import dataclass
-from typing import Tuple, Callable
+from typing import Tuple, Callable, Optional
 import logging
 from abc import ABC, abstractmethod
 logger = logging.getLogger(__name__)
@@ -36,9 +36,9 @@ class GroundTruth:
     """
     Holds ground truth functions for simulations.
     """
-    tau: Callable[[np.ndarray], np.ndarray]  # tau(X) = E[Y^1 - Y^0 | X]
-    pi_E: Callable[[np.ndarray], float]  # pi_E(X) = P(A=1 | X, R=0)
-    e_O: Callable[[np.ndarray], float]  # e_O(X) = P(A=1 | X, R=1)
+    tau: Optional[Callable[[np.ndarray], np.ndarray]]  # tau(X) = E[Y^1 - Y^0 | X]
+    pi_E: Optional[Callable[[np.ndarray], float]]  # pi_E(X) = P(A=1 | X, R=0)
+    e_O: Optional[Callable[[np.ndarray], float]]  # e_O(X) = P(A=1 | X, R=1)
     
 
 class BaseDataset(ABC):

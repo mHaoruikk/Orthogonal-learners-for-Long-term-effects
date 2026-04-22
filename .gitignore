@@ -11,3 +11,5 @@ notebooks/_rebuild_nb.py
 .vscode/
 docs/.
 docs/Description-IST3.pdf
+
+CLAUDE.md

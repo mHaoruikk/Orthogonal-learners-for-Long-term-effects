@@ -28,7 +28,7 @@ class TLearner:
         reg1 = build_regressor(g_cfg)
 
         # Build pseudo-outcomes using cross-fitted h
-        Y_tilde = np.empty_like(S_e, dtype=float)
+        Y_tilde = np.empty(X_e.shape[0], dtype=float)
         for k in range(K):
             nm_k = cf_nuis.folds[k]
             idx_k = np.where(cf_nuis.fold_id_e == k)[0]

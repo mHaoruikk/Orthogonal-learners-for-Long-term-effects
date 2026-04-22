@@ -1,0 +1,33 @@
+name: real-world-ist
+type: real_world
+data_path: src/data/ist_real.csv
+
+numerical_cols:
+  - age
+  - nihss
+  - gcs_score_rand
+  - sbprand
+  - dbprand
+  - glucose
+  - weight
+  - R_infarct_size
+  - konprob
+  - randdelay
+
+binary_cols:
+  - gender
+  - pred_nihss
+  - atrialfib_rand
+  - stroke_pre
+  - antiplat_rand
+  - livealone_rand
+  - indepinadl_rand
+  - vis_infarct
+  - glucose_missing
+
+categorical_cols:
+  - stroketype
+  - country
+
+dim_x: 31
+seed: 42

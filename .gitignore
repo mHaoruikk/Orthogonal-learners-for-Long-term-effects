@@ -9,7 +9,9 @@ scripts/commands.txt
 notebooks/_rebuild_nb.py
 /notebooks/*.pdf
 .vscode/
+scripts/bump_pehe.py
 docs/.
+docs/lto-learners-overleaf/*
 docs/Description-IST3.pdf
 
 CLAUDE.md

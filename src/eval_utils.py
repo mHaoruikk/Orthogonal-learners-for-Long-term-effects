@@ -52,7 +52,7 @@ NN_CATE_REGRESSOR_CFG = {
     "parameters": {
         "hidden_layers": [20, 20, 10, 10],
         "output_activation": "identity",
-        "epochs": 40,
+        "epochs": 20,
         "batch_size": 64,
         "lr": 1e-3,
         "device": "cpu",

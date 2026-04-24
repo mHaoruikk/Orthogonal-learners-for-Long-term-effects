@@ -13,11 +13,13 @@ class LTO_Learner:
         L_omega(g, eta) = E[ omega*(Z;eta) g(X)^2 - 2 T_LT(Z;eta) g(X) ]
     where omega* is the LT weighting function and T_LT is the LT pseudo-outcome.
 
-    Four weight_type choices for omega(X):
+    Six weight_type choices for omega(X):
         "identity" : omega = 1
         "to"       : omega = pi(1-pi)           (treatment overlap)
+        "to-sq"    : omega = pi^2 (1-pi)^2
         "lo"       : omega = rho                 (long-term overlap)
         "dual"     : omega = pi(1-pi) rho
+        "dual-sq"  : omega = pi^2 (1-pi)^2 rho
     """
 
     def __init__(self, model_cfg):
@@ -41,6 +43,10 @@ class LTO_Learner:
             self.omega     = lambda pi, rho: pi * (1 - pi)
             self.omega_pi  = lambda pi, rho: 1 - 2 * pi
             self.omega_rho = lambda pi, rho: np.zeros_like(pi)
+        elif weight_type == "to-sq":
+            self.omega     = lambda pi, rho: (pi * (1 - pi)) ** 2
+            self.omega_pi  = lambda pi, rho: 2 * pi * (1 - pi) * (1 - 2 * pi)
+            self.omega_rho = lambda pi, rho: np.zeros_like(pi)
         elif weight_type == "lo":
             self.omega     = lambda pi, rho: rho
             self.omega_pi  = lambda pi, rho: np.zeros_like(pi)
@@ -49,6 +55,10 @@ class LTO_Learner:
             self.omega     = lambda pi, rho: pi * (1 - pi) * rho
             self.omega_pi  = lambda pi, rho: (1 - 2 * pi) * rho
             self.omega_rho = lambda pi, rho: pi * (1 - pi)
+        elif weight_type == "dual-sq":
+            self.omega     = lambda pi, rho: (pi * (1 - pi)) ** 2 * rho
+            self.omega_pi  = lambda pi, rho: 2 * pi * (1 - pi) * (1 - 2 * pi) * rho
+            self.omega_rho = lambda pi, rho: (pi * (1 - pi)) ** 2
         else:
             raise ValueError(f"Unknown weight_type: {weight_type}")
 

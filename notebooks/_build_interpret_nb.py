@@ -56,8 +56,8 @@ from src.data.base_dataset import TwoSampleDataSplit
 from src.data.utils import load_config
 from src.model.lto_learner import LTO_Learner
 
-# Seed-threading helper (reused verbatim from evaluate_realworld)
-from evaluate_realworld import seed_model_cfg
+# Seed-threading helper (reused from src.eval_utils)
+from src.eval_utils import seed_model_cfg
 
 RETAIN_SEED = 42
 S_SEEDS = 20

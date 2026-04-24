@@ -12,13 +12,13 @@ nuisances:
       subsample: 0.8
       colsample_bytree: 0.8
   mu_0:
-    type: xgboost
+    type: linear
     parameters:
-      fit_intercept: False
+      fit_intercept: true
   mu_1:
-    type: xgboost
+    type: linear
     parameters:
-      fit_intercept: False
+      fit_intercept: true
 
 cate_regressor:
   type: xgboost

@@ -211,11 +211,16 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         )
 
     def tau_S(self, X: np.ndarray) -> np.ndarray:
-        return 0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3]) + 1
+        return (
+            0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3])
+            +  2 * np.sin(np.pi * X[:, 5] * X[:, 6])
+            + 2 * (X[:, 0] + X[:, 1]) ** 2
+        )
 
     def b(self, X: np.ndarray, S: np.ndarray) -> np.ndarray:
         # Spec: sin(X0*X1) + X6^2 + X7 + S  (1-indexed X7,X8 → 0-indexed X[:,6],X[:,7])
-        return np.sin(X[:, 0] * X[:, 1]) + X[:, 6] ** 2 + X[:, 7] + S
+        return np.sin(X[:, 0] * X[:, 1]) + + 2 * (X[:, 2] - 0.5) ** 2 + \
+            np.cos(np.pi * X[:, 3]) *X[:, 6] ** 2 + X[:, 7] * X[:, 8] + S
 
     def tau_Y(self, X: np.ndarray) -> np.ndarray:
         return np.zeros(X.shape[0])  

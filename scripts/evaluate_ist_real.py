@@ -20,7 +20,7 @@ retained TwoSampleDataSplit (it cross-fits its own nuisances
 internally); we then read off tau_hat_s on the R==0 rows.
 
 Usage (lte conda env):
-    ~/AppData/Local/miniconda3/envs/lte/python.exe -m scripts.evaluate_realworld \\
+    ~/AppData/Local/miniconda3/envs/lte/python.exe -m scripts.evaluate_ist_real \\
         --model T-learner --S_seeds 20 --seed 42
 """
 from __future__ import annotations
@@ -29,11 +29,10 @@ import argparse
 import json
 import logging
 import warnings
-from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBRegressor
 
@@ -43,65 +42,14 @@ logging.getLogger("sklearn").setLevel(logging.ERROR)
 from src.data.base_dataset import TwoSampleDataSplit
 from src.data.real_world import RealWorldIST
 from src.data.utils import load_config
-from src.model.ipw_learner import IPW_Learner
-from src.model.lto_learner import LTO_Learner
-from src.model.ra_learner import RA_Learner
-from src.model.t_learner import TLearner
+from src.eval_utils import DEFAULT_MODELS, LEARNER_REGISTRY, seed_model_cfg
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("evaluate_realworld")
-
-LEARNER_REGISTRY = {
-    "T-learner":   TLearner,
-    "DR-learner":  LTO_Learner,   # cfg sets weight_type=identity
-    "TO-learner":  LTO_Learner,   # cfg sets weight_type=to
-    "LO-learner":  LTO_Learner,   # cfg sets weight_type=lo
-    "DO-learner":  LTO_Learner,   # cfg sets weight_type=dual
-    "IPW-learner": IPW_Learner,
-    "RA-learner":  RA_Learner,
-}
-
-DEFAULT_MODELS = [
-    "T-learner", "DR-learner", "TO-learner", "LO-learner",
-    "DO-learner", "IPW-learner", "RA-learner",
-]
+logger = logging.getLogger("evaluate_ist_real")
 
 N_STRATA = 10
 GT_SEED = 20260422       # fixed seed for ground-truth mu_a and overlap pi/rho
 OUTPUT_PATH = Path("outputs/real-world.json")
-
-
-def seed_model_cfg(cfg: DictConfig, seed: int) -> DictConfig:
-    """Deep-copy cfg and inject `seed` into every random_state / seed field.
-
-    - Top-level: `cfg.random_state = seed` (read by NuisanceFactory for its KFold).
-    - Every sub-node with a `type` field: `parameters.random_state = seed`,
-      plus `parameters.seed = seed` for xgboost.
-    """
-    new_cfg = deepcopy(cfg)
-    OmegaConf.set_struct(new_cfg, False)
-    new_cfg.random_state = int(seed)
-
-    # sklearn base types that accept a `random_state` kwarg.
-    _RS_TYPES = {"random_forest", "logistic", "lasso", "ridge", "elasticnet"}
-
-    def _walk(node):
-        if not isinstance(node, DictConfig):
-            return
-        if "type" in node:
-            t = str(node.type).lower()
-            if t in _RS_TYPES or t == "xgboost":
-                if node.get("parameters") is None:
-                    node.parameters = OmegaConf.create({})
-                node.parameters.random_state = int(seed)
-                if t == "xgboost":
-                    node.parameters.seed = int(seed)
-            # linear, solve_linear, torch_mlp: no random_state kwarg; skip.
-        for k in list(node.keys()):
-            _walk(node[k])
-
-    _walk(new_cfg)
-    return new_cfg
 
 
 def fit_plug_in_mu(

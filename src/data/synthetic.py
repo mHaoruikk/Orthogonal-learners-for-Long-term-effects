@@ -33,6 +33,11 @@ class BaseSyntheticDataset(BaseDataset):
         self.S_e, self.S_o = None, None
         self.Y_e, self.Y_o = None, None
 
+        # Y normalization parameters set by sample(): Y → (Y − _y_mean) / _y_std.
+        # true_cate divides by _y_std to match the normalized outcome scale.
+        self._y_mean = 0.0
+        self._y_std = 1.0
+
     @abstractmethod
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -83,12 +88,28 @@ class BaseSyntheticDataset(BaseDataset):
         """
         ...
 
-    @abstractmethod
-    def true_cate(self, X: np.ndarray) -> np.ndarray:
+    def true_cate(self, X: np.ndarray, n_quad: int = 21) -> np.ndarray:
         """
-        τ(X) = E[Y^1 - Y^0 | X].
+        τ(X) = E_δ[b(X, μ_1(X)+δ)] − E_δ[b(X, μ_0(X)+δ)] + τ_Y(X)
+        with μ_a(X) = a(X) + (a−0.5)·τ_S(X) and δ ~ N(0, σ_s²),
+        evaluated by Gauss–Hermite quadrature. Valid for any b.
+
+        Divides by self._y_std so τ matches the normalized Y returned by sample().
         """
-        ...
+        nodes, weights = np.polynomial.hermite_e.hermegauss(n_quad)
+        norm = np.sqrt(2 * np.pi)
+        a_x = self.a(X)
+        tau_s = self.tau_S(X)
+        mu1 = a_x + 0.5 * tau_s
+        mu0 = a_x - 0.5 * tau_s
+
+        Y1 = np.zeros(X.shape[0])
+        Y0 = np.zeros(X.shape[0])
+        for xi, w in zip(nodes, weights):
+            delta = self.sigma_s * xi
+            Y1 += (w / norm) * self.b(X, mu1 + delta)
+            Y0 += (w / norm) * self.b(X, mu0 + delta)
+        return ((Y1 - Y0) + self.tau_Y(X)) / self._y_std
 
     def sample(self) -> Tuple[TwoSampleDataSplit, GroundTruth]:
         """
@@ -126,6 +147,14 @@ class BaseSyntheticDataset(BaseDataset):
         b_e = self.b(X_e, S_e)
         Y_e = b_e + (A_e - 0.5) * tau_Y_e + eps_e
 
+        # Normalize Y based on the sampled observational outcome.
+        self._y_mean = float(Y_o.mean())
+        self._y_std = float(Y_o.std())
+        if self._y_std == 0.0:
+            self._y_std = 1.0
+        Y_o = (Y_o - self._y_mean) / self._y_std
+        Y_e = (Y_e - self._y_mean) / self._y_std
+
         data = TwoSampleDataSplit(
             X_e=X_e.copy(),
             A_e=A_e.copy(),
@@ -160,6 +189,9 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         self.gamma_rho = config.get("gamma_rho", 0.0)  # long-term outcome overlap difficulty (γ_ρ)
         self.eta_pi = config.get("eta_pi", 0.05)       # lower/upper bound for π: π ∈ (η_π, 1−η_π)
         self.eta_rho = config.get("eta_rho", 0.01)     # lower bound for ρ: ρ ∈ (η_ρ, 1)
+        # Toggle to fall back to the original Nie-Wager DGP (linear-in-S b,
+        # linear τ_S+1, standardised π_E logits). Used as a baseline.
+        self.use_old_dgp = bool(config.get("use_old_dgp", False))
 
     def sample_covariates(self, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
         # Always draw from a single uniform pool and split by R ~ Ber(rho(X)).
@@ -179,19 +211,19 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
     _H_STD  = (13.0 / 15.0) ** 0.5   # ≈ 0.9309
 
     def pi_E(self, X: np.ndarray) -> np.ndarray:
-        # Option A — standardised Nie-Wager feature map (zero-mean, unit-variance logit).
-        # π(X) = η_π + (1 − 2η_π) · σ(γ_π · Z(X))
-        # Z(X) = (X0·X1 + X2 + X3 + X7² − 1/3) / √(13/15)  ≈ N(0,1) by CLT
-        # Analytical boundary mass: P(π within 0.1 of bound) ≈ 2·Φ(−2.20/γ_π)
-        #   → γ_π ≈ 2 gives ~28%, γ_π ≈ 3 gives ~47%
+        # π(X) = η_π + (1 − 2η_π) · σ(γ_π · h(X)).
+        # Old DGP: standardised h (zero-mean, unit-variance logit).
+        # New DGP: unstandardised h.
         h = X[:, 0] * X[:, 1] + X[:, 2] + X[:, 3] + X[:, 7] ** 2
-        logits = self.gamma * (h - self._H_MEAN) / self._H_STD
+        if self.use_old_dgp:
+            logits = self.gamma * (h - self._H_MEAN) / self._H_STD
+        else:
+            logits = self.gamma * h
         return self.eta_pi + (1 - 2 * self.eta_pi) / (1 + np.exp(-logits))
         
     def rho_x(self, X: np.ndarray) -> np.ndarray:
-        # Smooth lower-bounded propensity: ρ(X) = η_ρ + (1 − η_ρ)·σ(X0 + X1 + γ_ρ)
-        # Maps smoothly to (η_ρ, 1); larger γ_ρ → more units in observational sample (R=1),
-        # i.e., sparser experimental coverage → worse long-term overlap.
+        # Smooth lower-bounded propensity: ρ(X) = η_ρ + (1 − η_ρ)·σ(X0 + X1 − γ_ρ).
+        # Larger γ_ρ → ρ smaller → smaller observational sample.
         logits = X[:, 0] + X[:, 1] - self.gamma_rho
         return self.eta_rho + (1 - self.eta_rho) / (1 + np.exp(-logits))
 
@@ -211,15 +243,23 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         )
 
     def tau_S(self, X: np.ndarray) -> np.ndarray:
+        if self.use_old_dgp:
+            return 0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3]) + 1
         return (
-            0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3])
+            #0.25 * (X[:, 0] + X[:, 1] + X[:, 2] + X[:, 3])
             +  2 * np.sin(np.pi * X[:, 5] * X[:, 6])
             + 2 * (X[:, 7] - 0.3) ** 2
         )
 
     def b(self, X: np.ndarray, S: np.ndarray) -> np.ndarray:
-        # Spec: sin(X0*X1) + X6^2 + X7 + S  (1-indexed X7,X8 → 0-indexed X[:,6],X[:,7])
-        return np.sin(X[:, 0] * X[:, 1]) + + 4 * (X[:, 2] - 0.5) ** 2 - 2 * X[:, 7] * X[:, 8] + S
+        if self.use_old_dgp:
+            # Original Nie-Wager: b(X,S) = sin(X0·X1) + X6² + X7 + S (linear in S).
+            return np.sin(X[:, 0] * X[:, 1]) + X[:, 6] ** 2 + X[:, 7] + (S ** 2) / 4
+        return (
+                #np.sin(X[:, 0] * X[:, 1])
+                +  4 * ((X[:, 2:] - 0.5) ** 2).mean(axis=1)
+                - 2 * X[:, 7] * X[:, 8]
+                + S ** 2)
 
     def tau_Y(self, X: np.ndarray) -> np.ndarray:
         return np.zeros(X.shape[0])  
@@ -229,10 +269,6 @@ class NieWagerSyntheticDataset(BaseSyntheticDataset):
         Ground-truth h(S, X) = E[Y | S, X, R=1] under the data-generating process.
         """
         return self.b(X, S) + (self.e_O(X) - 0.5) * self.tau_Y(X)
-
-    def true_cate(self, X: np.ndarray) -> np.ndarray:
-        return self.tau_S(X)
-    
 
 
     

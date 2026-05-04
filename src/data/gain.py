@@ -45,7 +45,8 @@ X_COLS = [
 A_COL = "e"
 RIVER_COL = "river"
 
-VALID_Y_KINDS = ("mean", "q36", "last_year")
+VALID_Y_KINDS = ("mean", "q36", "last_year", "mean_30_36",
+                 "emp_mean", "emp_q36", "emp_30_36")
 
 
 def _build_surrogate(df: pd.DataFrame, q_start: int, q_end: int) -> np.ndarray:
@@ -60,9 +61,17 @@ def _build_surrogate(df: pd.DataFrame, q_start: int, q_end: int) -> np.ndarray:
 def _build_y(df: pd.DataFrame, kind: str, scale: float = 1.0) -> np.ndarray:
     """Long-term outcome variants, multiplied by `scale`.
 
-    - "mean"      : Y = mean(tcedd13..tcedd36)   (Athey-style long-run, default)
-    - "q36"       : Y = tcedd36                  (terminal quarter)
-    - "last_year" : Y = mean(tcedd33..tcedd36)   (final-year mean)
+    Earnings kinds (raw $/quarter, scaled by `scale`):
+    - "mean"       : Y = mean(tcedd13..tcedd36)   (Athey-style long-run, default)
+    - "q36"        : Y = tcedd36                  (terminal quarter)
+    - "last_year"  : Y = mean(tcedd33..tcedd36)   (final-year mean)
+    - "mean_30_36" : Y = mean(tcedd30..tcedd36)   (terminal 7-quarter mean)
+
+    Employment kinds (each quarter's employment indicator = 1{tcedd_k > 0};
+    the dataset has no native employment field, this matches Athey et al.):
+    - "emp_mean"   : Y = mean_{k=13..36} 1{tcedd_k > 0}   (mean employment rate)
+    - "emp_q36"    : Y = 1{tcedd_36 > 0}                  (terminal-quarter employment)
+    - "emp_30_36"  : Y = mean_{k=30..36} 1{tcedd_k > 0}   (terminal 7-quarter mean employment)
     """
     if kind == "mean":
         cols = [f"tcedd{k}" for k in range(13, 37)]
@@ -72,6 +81,17 @@ def _build_y(df: pd.DataFrame, kind: str, scale: float = 1.0) -> np.ndarray:
     elif kind == "last_year":
         cols = [f"tcedd{k}" for k in range(33, 37)]
         y = df[cols].to_numpy(dtype=float).mean(axis=1)
+    elif kind == "mean_30_36":
+        cols = [f"tcedd{k}" for k in range(30, 37)]
+        y = df[cols].to_numpy(dtype=float).mean(axis=1)
+    elif kind == "emp_mean":
+        cols = [f"tcedd{k}" for k in range(13, 37)]
+        y = (df[cols].to_numpy(dtype=float) > 0).astype(float).mean(axis=1)
+    elif kind == "emp_q36":
+        y = (df["tcedd36"].to_numpy(dtype=float) > 0).astype(float)
+    elif kind == "emp_30_36":
+        cols = [f"tcedd{k}" for k in range(30, 37)]
+        y = (df[cols].to_numpy(dtype=float) > 0).astype(float).mean(axis=1)
     else:
         raise ValueError(f"y_kind must be one of {VALID_Y_KINDS}, got {kind!r}")
     return y * float(scale)
@@ -178,6 +198,12 @@ class RealWorldGAIN(BaseDataset):
         if self.y_kind not in VALID_Y_KINDS:
             raise ValueError(f"y_kind must be one of {VALID_Y_KINDS}, got {self.y_kind!r}")
         self.y_scale = float(getattr(config, "y_scale", 1.0))
+        if self.y_kind.startswith("emp_") and self.y_scale != 1.0:
+            logger.info(
+                "RealWorldGAIN: y_kind=%r is an employment rate in [0,1]; overriding "
+                "y_scale %g -> 1.0", self.y_kind, self.y_scale,
+            )
+            self.y_scale = 1.0
 
         self.gamma_pi = float(getattr(config, "gamma_pi", 2.0))
         self.beta_earn = float(getattr(config, "beta_earn", 0.7))

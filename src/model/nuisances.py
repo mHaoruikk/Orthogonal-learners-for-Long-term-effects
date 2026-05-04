@@ -131,12 +131,9 @@ class NuisanceFactory:
                 rho_x_est = build_classifier(nuis_cfg["rho_x"])
                 rho_x_est.fit(X_comb[train_comb], R_comb[train_comb])
                 nm.rho_x = rho_x_est
-
-            # ---- rho_s_x: P(R=1 | S,X) ----
+            
             if "rho_s_x" in nuis_cfg:
-                SX_e = np.column_stack([S_e, X_e])
-                SX_o = np.column_stack([S_o, X_o])
-                SX_comb = np.vstack([SX_e, SX_o])
+                X_comb = np.vstack([X_e, X_o])
                 R_comb = np.concatenate([np.zeros(n_e, dtype=int), np.ones(n_o, dtype=int)])
                 train_comb = np.concatenate([
                     np.where(fold_id_e != k)[0],
@@ -144,7 +141,7 @@ class NuisanceFactory:
                 ])
 
                 rho_s_x_est = build_classifier(nuis_cfg["rho_s_x"])
-                rho_s_x_est.fit(SX_comb[train_comb], R_comb[train_comb])
+                rho_s_x_est.fit(X_comb[train_comb], R_comb[train_comb])
                 nm.rho_s_x = rho_s_x_est
 
             folds.append(nm)

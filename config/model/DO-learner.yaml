@@ -39,22 +39,25 @@ nuisances:
       tol: 1e-4
       fit_intercept: true
   h:
+    type: linear
+    parameters:
+      fit_intercept: true
+  mu_0:
     type: xgboost
-    crossfit: true
     parameters:
       n_estimators: 100
       max_depth: 5
       learning_rate: 0.1
       subsample: 0.8
       colsample_bytree: 0.8
-  mu_0:
-    type: xgboost
-    parameters:
-      fit_intercept: False
   mu_1:
     type: xgboost
     parameters:
-      fit_intercept: False
+      n_estimators: 100
+      max_depth: 5
+      learning_rate: 0.1
+      subsample: 0.8
+      colsample_bytree: 0.8
 
 cate_regressor:
   type: xgboost

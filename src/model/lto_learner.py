@@ -139,7 +139,7 @@ class LTO_Learner:
                 nm.pi_s_x.predict(np.column_stack([Sok, Xok])), 1e-3, 1 - 1e-3
             )
             rho_sx_o = np.clip(
-                nm.rho_s_x.predict(np.column_stack([Sok, Xok])), 1e-3, 1 - 1e-3
+                nm.rho_s_x.predict(Xok), 1e-3, 1 - 1e-3
             )
             mu0_o = nm.mu_0.predict(Xok)
             mu1_o = nm.mu_1.predict(Xok)

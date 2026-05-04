@@ -1,22 +1,23 @@
-"""GAIN Experiment A — pseudo-PEHE and per-unit estimator variance, swept
-over a fixed list of long-term outcome variants.
+"""GAIN Experiment C — surrogacy sensitivity via T-sweep.
 
-For each y_kind in Y_KINDS:
-  * Build a fresh RealWorldGAIN with that y_kind and `--master_seed`.
-    The Riverside rejection mask + 80/20 train/test split do NOT depend on
-    y_kind (they only use covariates), so X_train / X_test are identical
-    across y_kinds — only tau_star_test differs.
+For each T in T_VALUES:
+  * Build a fresh RealWorldGAIN with s_quarter_end=T (s_quarter_start=1) and
+    `--master_seed`. The Riverside rejection mask + 80/20 train/test split do
+    NOT depend on T (they only use covariates), so X_train / X_test are
+    identical across T values. The pseudo-oracle tau* is a function of Y only
+    (Y = mean(tcedd13..36)) and is therefore also identical across T — the
+    same cached vector is reused.
   * For each learner, run B replicates (seeds 0..B-1) and record
         pehe_per_x[i] = mean_b ((tau_hat_b(x_i) - tau_star(x_i))^2)
         var_per_x[i]  = Var_b  (tau_hat_b(x_i))
+        ate_per_seed  = mean_x tau_hat_b(x)
+    Report ATE bias against the pseudo-oracle ATE on the held-out test pool:
+        ate_bias = mean(ate_per_seed) - mean(tau_star_test).
 
-The model-agnostic overlap score w_hat(x) on X_test (§5.1 step 1) is
-covariate-only, so it is computed once and stored at the top level.
-
-Output: outputs/gain-full-pehe.json.
+Output: outputs/gain-surrogacy-sensitivity.json.
 
 Usage:
-    ~/AppData/Local/miniconda3/envs/lte/python.exe -m scripts.eval_gain_pehe \\
+    ~/AppData/Local/miniconda3/envs/lte/python.exe -m scripts.gain_sensitivity \\
         --B 5 --master_seed 42
 """
 from __future__ import annotations
@@ -30,7 +31,6 @@ from pathlib import Path
 
 import numpy as np
 from omegaconf import OmegaConf
-from sklearn.ensemble import RandomForestClassifier
 
 warnings.filterwarnings("ignore")
 logging.getLogger("sklearn").setLevel(logging.ERROR)
@@ -40,48 +40,17 @@ from src.data.utils import load_config
 from src.eval_utils import LEARNER_REGISTRY, seed_model_cfg
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("eval_gain_pehe")
+logger = logging.getLogger("gain_sensitivity")
 
-# Outcome variants swept by this experiment (see src/data/gain.py::_build_y).
-Y_KINDS = ["mean", "mean_30_36", "emp_mean", "emp_30_36"]
+# §5.3: T in {2, 4, 6, 12}. T sets s_quarter_end with s_quarter_start fixed at 1.
+T_VALUES = [2, 4, 6, 12]
 
-DEFAULT_PEHE_MODELS = [
+DEFAULT_MODELS = [
     "T-learner", "DR-learner", "TO-learner", "LO-learner",
     "DO-learner", "IPW-learner", "RA-learner",
 ]
 
-DEFAULT_OUTPUT_PATH = Path("outputs/gain-full-pehe.json")
-OVERLAP_RF_SEED = 20260423  # fixed across runs so omega_hat is reproducible
-
-
-def compute_overlap_score(ds: RealWorldGAIN) -> np.ndarray:
-    """omega_hat(x) = pi_hat(x)(1-pi_hat(x)) * rho_hat(x) on X_test.
-
-    pi_hat fit on D1_train (post-filter Riverside 80%); rho_hat fit on
-    D1_train U D2. Both via RandomForest with a fixed seed — no cross-fitting
-    needed because X_test is held out. This is the "single, fixed" estimator
-    per §5.1 step 1. y-independent.
-    """
-    X_train, A_train = ds.X_train, ds.A_train
-    X_other = ds.X_other
-    X_test = ds.X_test
-
-    rf_params = dict(
-        n_estimators=500, max_depth=None, min_samples_leaf=5,
-        n_jobs=-1, random_state=OVERLAP_RF_SEED,
-    )
-
-    pi_rf = RandomForestClassifier(**rf_params)
-    pi_rf.fit(X_train, A_train)
-    pi_te = np.clip(pi_rf.predict_proba(X_test)[:, 1], 1e-3, 1.0 - 1e-3)
-
-    X_all = np.concatenate([X_train, X_other], axis=0)
-    R_all = np.concatenate([np.zeros(len(X_train)), np.ones(len(X_other))])
-    rho_rf = RandomForestClassifier(**rf_params)
-    rho_rf.fit(X_all, R_all)
-    rho_te = rho_rf.predict_proba(X_test)[:, 1]
-
-    return pi_te * (1.0 - pi_te) * rho_te
+DEFAULT_OUTPUT_PATH = Path("outputs/gain-surrogacy-sensitivity.json")
 
 
 def run_one_model(
@@ -109,21 +78,28 @@ def run_one_model(
     tau_star = ds.tau_star_test
     sq_err = (tau_matrix - tau_star[None, :]) ** 2
     pehe_per_x = sq_err.mean(axis=0)
-    pehe_per_seed = sq_err.mean(axis=1)  # length B: overall PEHE per replicate
+    pehe_per_seed = sq_err.mean(axis=1)
     var_per_x = tau_matrix.var(axis=0, ddof=1) if B > 1 else np.zeros(n_test)
+    ate_per_seed = tau_matrix.mean(axis=1)
+
+    ate_oracle = float(tau_star.mean())
+    ate_mean = float(ate_per_seed.mean())
 
     return {
         "pehe_per_x": pehe_per_x.tolist(),
         "pehe_per_seed": pehe_per_seed.tolist(),
         "var_per_x": var_per_x.tolist(),
+        "ate_per_seed": ate_per_seed.tolist(),
         "pehe_mean": float(pehe_per_x.mean()),
         "var_mean": float(var_per_x.mean()),
+        "ate_mean": ate_mean,
+        "ate_bias": ate_mean - ate_oracle,
     }
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--models", nargs="+", default=DEFAULT_PEHE_MODELS,
+    p.add_argument("--models", nargs="+", default=DEFAULT_MODELS,
                    choices=sorted(LEARNER_REGISTRY),
                    help="learners to evaluate")
     p.add_argument("--dataset", default="gain",
@@ -133,6 +109,12 @@ def main():
                    help="number of replicates per learner")
     p.add_argument("--master_seed", type=int, default=42,
                    help="fixes Riverside rejection sampling + 80/20 split")
+    p.add_argument("--T_values", nargs="+", type=int, default=T_VALUES,
+                   help="surrogate horizons to sweep (s_quarter_end values)")
+    p.add_argument("--y_kind", default="mean",
+                   help="long-term outcome variant (see src/data/gain.py)")
+    p.add_argument("--gamma_pi", type=float, default=2.0,
+                   help="rejection-sampling intensity (Experiment C fixes this)")
     p.add_argument("--output", default=str(DEFAULT_OUTPUT_PATH),
                    help="output JSON path")
     args = p.parse_args()
@@ -141,53 +123,50 @@ def main():
         dataset=args.dataset, model=args.models[0], trainer=args.trainer,
     ).dataset
 
-    overlap_score: np.ndarray | None = None
     test_size: int | None = None
-    shared_meta: dict | None = None
-    results_by_y_kind: dict = {}
+    tau_star_test_ref: np.ndarray | None = None
+    results_by_T: dict = {}
 
-    for y_kind in Y_KINDS:
-        logger.info("######## y_kind = %s ########", y_kind)
+    for T in args.T_values:
+        logger.info("######## T = %d ########", T)
         ds_cfg = deepcopy(base_ds_cfg)
         OmegaConf.set_struct(ds_cfg, False)
-        ds_cfg.y_kind = y_kind
-        # y_scale is auto-overridden to 1.0 for emp_* kinds inside RealWorldGAIN.
+        ds_cfg.s_quarter_start = 1
+        ds_cfg.s_quarter_end = int(T)
+        ds_cfg.y_kind = args.y_kind
+        ds_cfg.gamma_pi = float(args.gamma_pi)
 
         ds = RealWorldGAIN(ds_cfg)
         ds.resample(args.master_seed)
 
-        if overlap_score is None:
-            overlap_score = compute_overlap_score(ds)
+        if test_size is None:
             test_size = int(len(ds.X_test))
-            shared_meta = {
-                "gamma_pi": float(ds.gamma_pi),
-                "s_quarter_range": [ds.s_quarter_start, ds.s_quarter_end],
-            }
-            logger.info(
-                "omega_hat on X_test: mean=%.4f  min=%.4f  max=%.4f",
-                float(overlap_score.mean()),
-                float(overlap_score.min()), float(overlap_score.max()),
-            )
+            tau_star_test_ref = ds.tau_star_test.copy()
+        else:
+            # Cross-T sanity: split is covariate-only, oracle is Y-only — both
+            # must be invariant to T. If not, something upstream broke.
+            if not np.allclose(ds.tau_star_test, tau_star_test_ref):
+                raise RuntimeError(
+                    f"tau_star_test changed between T values; expected invariance"
+                )
 
         logger.info(
-            "GAIN Experiment A: y_kind=%s  y_scale=%g  n_test=%d  gamma_pi=%s  s=[%d,%d]",
-            ds.y_kind, ds.y_scale, len(ds.X_test), ds.gamma_pi,
-            ds.s_quarter_start, ds.s_quarter_end,
+            "GAIN Experiment C: T=%d  y_kind=%s  y_scale=%g  n_test=%d  gamma_pi=%s",
+            T, ds.y_kind, ds.y_scale, len(ds.X_test), ds.gamma_pi,
         )
 
         models_results: dict = {}
         for model_name in args.models:
-            logger.info("=== %s [%s] ===", model_name, y_kind)
+            logger.info("=== %s [T=%d] ===", model_name, T)
             res = run_one_model(model_name, args.dataset, args.trainer, args.B, ds)
             models_results[model_name] = res
             logger.info(
-                "[%s][%s] pehe_mean=%.4f  var_mean=%.4f",
-                model_name, y_kind, res["pehe_mean"], res["var_mean"],
+                "[%s][T=%d] pehe_mean=%.4f  var_mean=%.4f  ate_bias=%+.4f",
+                model_name, T, res["pehe_mean"], res["var_mean"], res["ate_bias"],
             )
 
-        results_by_y_kind[y_kind] = {
-            "y_scale": float(ds.y_scale),
-            "tau_star_test": ds.tau_star_test.tolist(),
+        results_by_T[str(T)] = {
+            "s_quarter_range": [1, int(T)],
             "models": models_results,
         }
 
@@ -198,13 +177,14 @@ def main():
             "B": args.B,
             "master_seed": args.master_seed,
             "models": list(args.models),
-            "y_kinds": list(Y_KINDS),
-            "overlap_rf_seed": OVERLAP_RF_SEED,
-            **(shared_meta or {}),
+            "T_values": [int(t) for t in args.T_values],
+            "y_kind": args.y_kind,
+            "gamma_pi": float(args.gamma_pi),
         },
         "test_size": test_size,
-        "overlap_score": overlap_score.tolist() if overlap_score is not None else [],
-        "results_by_y_kind": results_by_y_kind,
+        "tau_star_test": tau_star_test_ref.tolist() if tau_star_test_ref is not None else [],
+        "ate_oracle": float(tau_star_test_ref.mean()) if tau_star_test_ref is not None else None,
+        "results_by_T": results_by_T,
     }
 
     out_path = Path(args.output)

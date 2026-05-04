@@ -1,5 +1,5 @@
 name: LTO_Learner
-weight_type: lo             # identity | to | lo | dual
+weight_type: dual            # identity | to | lo | dual
 num_crossfit: 3
 
 nuisances:
@@ -39,8 +39,8 @@ nuisances:
       tol: 1e-4
       fit_intercept: true
   h:
-    #change to xgboost
     type: xgboost
+    crossfit: true
     parameters:
       n_estimators: 100
       max_depth: 5

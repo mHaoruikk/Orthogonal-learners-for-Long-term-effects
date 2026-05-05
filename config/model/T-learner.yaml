@@ -8,15 +8,15 @@ nuisances:
   h:     #config for h(S,X)
     type: linear # lasso, ridge, elasticnet, linear
     parameters:
-      fit_intercept: False
+      fit_intercept: true
   mu_0: #config for \mu(a,x)
-    type: lasso # lasso, ridge, elasticnet, linear
+    type: linear # lasso, ridge, elasticnet, linear
     parameters:
-      fit_intercept: False
+      fit_intercept: true
   mu_1: #config for \mu(a,x)
-    type: lasso # lasso, ridge, elasticnet, linear
+    type: linear # lasso, ridge, elasticnet, linear
     parameters:
-      fit_intercept: False
+      fit_intercept: true
   pi_x:  #config for estimator \pi(x)
     type: logistic
     parameters:

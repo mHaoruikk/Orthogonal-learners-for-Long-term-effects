@@ -4,21 +4,23 @@ For each T in T_VALUES:
   * Build a fresh RealWorldGAIN with s_quarter_end=T (s_quarter_start=1) and
     `--master_seed`. The Riverside rejection mask + 80/20 train/test split do
     NOT depend on T (they only use covariates), so X_train / X_test are
-    identical across T values. The pseudo-oracle tau* is a function of Y only
-    (Y = mean(tcedd13..36)) and is therefore also identical across T — the
-    same cached vector is reused.
-  * For each learner, run B replicates (seeds 0..B-1) and record
-        pehe_per_x[i] = mean_b ((tau_hat_b(x_i) - tau_star(x_i))^2)
+    identical across T values. The two pseudo-oracles tau*_DR and tau*_RA are
+    functions of Y only and are therefore also identical across T — the same
+    cached vectors are reused.
+  * For each learner, run B replicates (seeds 0..B-1). Record per-replicate
         var_per_x[i]  = Var_b  (tau_hat_b(x_i))
         ate_per_seed  = mean_x tau_hat_b(x)
-    Report ATE bias against the pseudo-oracle ATE on the held-out test pool:
-        ate_bias = mean(ate_per_seed) - mean(tau_star_test).
+    and per-oracle metrics (DR and RA, both surrogate-agnostic):
+        pehe_per_x[i] = mean_b ((tau_hat_b(x_i) - tau_star(x_i))^2)
+        ate_bias      = mean(ate_per_seed) - mean(tau_star_test)
+    Reporting both lets us check whether the IPW term in the DR oracle is
+    introducing finite-sample noise that drives the observed PEHE rankings.
 
-Output: outputs/gain-surrogacy-sensitivity.json.
+Output: outputs/gain-surrogacy-sensitivity-<y_kind>.json.
 
 Usage:
     ~/AppData/Local/miniconda3/envs/lte/python.exe -m scripts.gain_sensitivity \\
-        --B 5 --master_seed 42
+        --B 5 --master_seed 42 --y_kind emp_mean
 """
 from __future__ import annotations
 
@@ -53,6 +55,20 @@ DEFAULT_MODELS = [
 DEFAULT_OUTPUT_PATH = Path("outputs/gain-surrogacy-sensitivity.json")
 
 
+def _pehe_block(tau_matrix: np.ndarray, tau_star: np.ndarray) -> dict:
+    """PEHE / ATE-bias block against a single pseudo-oracle vector."""
+    sq_err = (tau_matrix - tau_star[None, :]) ** 2
+    pehe_per_x = sq_err.mean(axis=0)
+    pehe_per_seed = sq_err.mean(axis=1)
+    ate_mean = float(tau_matrix.mean(axis=1).mean())
+    return {
+        "pehe_per_x": pehe_per_x.tolist(),
+        "pehe_per_seed": pehe_per_seed.tolist(),
+        "pehe_mean": float(pehe_per_x.mean()),
+        "ate_bias": ate_mean - float(tau_star.mean()),
+    }
+
+
 def run_one_model(
     model_name: str, dataset: str, trainer: str, B: int, ds: RealWorldGAIN,
 ) -> dict:
@@ -70,30 +86,21 @@ def run_one_model(
         tau_hat = learner.predict_cate(ds.X_test)
         tau_matrix[b] = tau_hat
         logger.info(
-            "[%s] replicate %d/%d  tau_hat mean=%.3f std=%.3f",
+            "[%s] replicate %d/%d  tau_hat mean=%.4f std=%.4f",
             model_name, b + 1, B,
             float(tau_hat.mean()), float(tau_hat.std()),
         )
 
-    tau_star = ds.tau_star_test
-    sq_err = (tau_matrix - tau_star[None, :]) ** 2
-    pehe_per_x = sq_err.mean(axis=0)
-    pehe_per_seed = sq_err.mean(axis=1)
     var_per_x = tau_matrix.var(axis=0, ddof=1) if B > 1 else np.zeros(n_test)
     ate_per_seed = tau_matrix.mean(axis=1)
 
-    ate_oracle = float(tau_star.mean())
-    ate_mean = float(ate_per_seed.mean())
-
     return {
-        "pehe_per_x": pehe_per_x.tolist(),
-        "pehe_per_seed": pehe_per_seed.tolist(),
         "var_per_x": var_per_x.tolist(),
         "ate_per_seed": ate_per_seed.tolist(),
-        "pehe_mean": float(pehe_per_x.mean()),
         "var_mean": float(var_per_x.mean()),
-        "ate_mean": ate_mean,
-        "ate_bias": ate_mean - ate_oracle,
+        "ate_mean": float(ate_per_seed.mean()),
+        "vs_dr": _pehe_block(tau_matrix, ds.tau_star_test),
+        "vs_ra": _pehe_block(tau_matrix, ds.tau_star_ra_test),
     }
 
 
@@ -115,9 +122,11 @@ def main():
                    help="long-term outcome variant (see src/data/gain.py)")
     p.add_argument("--gamma_pi", type=float, default=2.0,
                    help="rejection-sampling intensity (Experiment C fixes this)")
-    p.add_argument("--output", default=str(DEFAULT_OUTPUT_PATH),
-                   help="output JSON path")
+    p.add_argument("--output", default=None,
+                   help="output JSON path (default: outputs/gain-surrogacy-sensitivity-<y_kind>.json)")
     args = p.parse_args()
+    if args.output is None:
+        args.output = f"outputs/gain-surrogacy-sensitivity-{args.y_kind}.json"
 
     base_ds_cfg = load_config(
         dataset=args.dataset, model=args.models[0], trainer=args.trainer,
@@ -125,6 +134,7 @@ def main():
 
     test_size: int | None = None
     tau_star_test_ref: np.ndarray | None = None
+    tau_star_ra_test_ref: np.ndarray | None = None
     results_by_T: dict = {}
 
     for T in args.T_values:
@@ -142,17 +152,22 @@ def main():
         if test_size is None:
             test_size = int(len(ds.X_test))
             tau_star_test_ref = ds.tau_star_test.copy()
+            tau_star_ra_test_ref = ds.tau_star_ra_test.copy()
         else:
-            # Cross-T sanity: split is covariate-only, oracle is Y-only — both
+            # Cross-T sanity: split is covariate-only, oracles are Y-only — all
             # must be invariant to T. If not, something upstream broke.
             if not np.allclose(ds.tau_star_test, tau_star_test_ref):
-                raise RuntimeError(
-                    f"tau_star_test changed between T values; expected invariance"
-                )
+                raise RuntimeError("DR tau_star_test changed between T values")
+            if not np.allclose(ds.tau_star_ra_test, tau_star_ra_test_ref):
+                raise RuntimeError("RA tau_star_test changed between T values")
 
         logger.info(
             "GAIN Experiment C: T=%d  y_kind=%s  y_scale=%g  n_test=%d  gamma_pi=%s",
             T, ds.y_kind, ds.y_scale, len(ds.X_test), ds.gamma_pi,
+        )
+        logger.info(
+            "  oracle ATE: DR=%+.4f  RA=%+.4f",
+            float(tau_star_test_ref.mean()), float(tau_star_ra_test_ref.mean()),
         )
 
         models_results: dict = {}
@@ -161,8 +176,11 @@ def main():
             res = run_one_model(model_name, args.dataset, args.trainer, args.B, ds)
             models_results[model_name] = res
             logger.info(
-                "[%s][T=%d] pehe_mean=%.4f  var_mean=%.4f  ate_bias=%+.4f",
-                model_name, T, res["pehe_mean"], res["var_mean"], res["ate_bias"],
+                "[%s][T=%d] var=%.4f  pehe_DR=%.4f bias_DR=%+.4f  "
+                "pehe_RA=%.4f bias_RA=%+.4f",
+                model_name, T, res["var_mean"],
+                res["vs_dr"]["pehe_mean"], res["vs_dr"]["ate_bias"],
+                res["vs_ra"]["pehe_mean"], res["vs_ra"]["ate_bias"],
             )
 
         results_by_T[str(T)] = {
@@ -182,8 +200,10 @@ def main():
             "gamma_pi": float(args.gamma_pi),
         },
         "test_size": test_size,
-        "tau_star_test": tau_star_test_ref.tolist() if tau_star_test_ref is not None else [],
-        "ate_oracle": float(tau_star_test_ref.mean()) if tau_star_test_ref is not None else None,
+        "tau_star_test_dr": tau_star_test_ref.tolist() if tau_star_test_ref is not None else [],
+        "tau_star_test_ra": tau_star_ra_test_ref.tolist() if tau_star_ra_test_ref is not None else [],
+        "ate_oracle_dr": float(tau_star_test_ref.mean()) if tau_star_test_ref is not None else None,
+        "ate_oracle_ra": float(tau_star_ra_test_ref.mean()) if tau_star_ra_test_ref is not None else None,
         "results_by_T": results_by_T,
     }
 

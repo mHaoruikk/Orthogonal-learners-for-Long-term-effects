@@ -168,6 +168,54 @@ def _pseudo_oracle_tau(
     return preds.mean(axis=0)
 
 
+def _pseudo_oracle_ra_tau(
+    X: np.ndarray, A: np.ndarray, Y: np.ndarray, seeds: list[int],
+) -> np.ndarray:
+    """Cross-fitted RA (T-learner) pseudo-oracle averaged over `seeds` runs.
+
+    Same skeleton as `_pseudo_oracle_tau` but with the regression-only pseudo-
+    outcome psi_i = mu_1_hat(x_i) - mu_0_hat(x_i) (no IPW correction). Lower
+    variance than DR when N is small or pi is near {0, 1}; higher bias if mu_a
+    is misspecified. Useful as a stability sanity check on the DR oracle.
+    """
+    n = X.shape[0]
+    mu_params = dict(
+        n_estimators=500, max_depth=4, learning_rate=0.05,
+        subsample=0.8, colsample_bytree=0.8,
+        n_jobs=-1, verbosity=0, tree_method="hist",
+    )
+    final_params = dict(
+        n_estimators=500, max_depth=4, learning_rate=0.05,
+        subsample=0.8, colsample_bytree=0.8,
+        n_jobs=-1, verbosity=0, tree_method="hist",
+    )
+
+    preds = np.zeros((len(seeds), n), dtype=float)
+    for s_idx, seed in enumerate(seeds):
+        kf = KFold(n_splits=5, shuffle=True, random_state=seed)
+        psi = np.empty(n, dtype=float)
+
+        for fold, (tr, te) in enumerate(kf.split(X)):
+            tr0 = tr[A[tr] == 0]
+            tr1 = tr[A[tr] == 1]
+            mu0 = XGBRegressor(**mu_params, random_state=seed * 100 + 10 * fold + 1)
+            mu1 = XGBRegressor(**mu_params, random_state=seed * 100 + 10 * fold + 2)
+            mu0.fit(X[tr0], Y[tr0])
+            mu1.fit(X[tr1], Y[tr1])
+            psi[te] = mu1.predict(X[te]) - mu0.predict(X[te])
+
+        final = XGBRegressor(**final_params, random_state=seed * 100 + 9999)
+        final.fit(X, psi)
+        preds[s_idx] = final.predict(X)
+        logger.info(
+            "  RA oracle run %d/%d (seed=%d): tau* mean=%.4f, std=%.4f",
+            s_idx + 1, len(seeds), seed,
+            float(preds[s_idx].mean()), float(preds[s_idx].std()),
+        )
+
+    return preds.mean(axis=0)
+
+
 class RealWorldGAIN(BaseDataset):
     """HLTE dataset built from the GAIN CSV (Athey-style Riverside vs. others).
 
@@ -244,8 +292,11 @@ class RealWorldGAIN(BaseDataset):
         self.x_earn_river = _zscore(earn)
         self.x_age_river = _zscore(age)
 
-        # §4 pseudo-oracle (cached)
+        # §4 pseudo-oracle (cached). Two flavours: DR (default) and RA. Both
+        # are functions of (X, A, Y) only — surrogate-agnostic — so they share
+        # cache lifetimes with `y_kind`/`y_scale`/`dim_x`.
         self.tau_star_river = self._compute_or_load_oracle()
+        self.tau_star_ra_river = self._compute_or_load_oracle_ra()
 
         # §3.3 + §3.4
         self.resample(self.seed)
@@ -284,6 +335,38 @@ class RealWorldGAIN(BaseDataset):
         return tau
 
     # ------------------------------------------------------------
+    def _oracle_ra_cache_path(self) -> Path:
+        key = "-".join(str(s) for s in self.oracle_seeds)
+        return (
+            self.data_path.parent
+            / f"tau_star_gain_ra_oseeds{key}_y-{self.y_kind}"
+              f"_sc{self.y_scale:g}_d{self.dim_x}.npy"
+        )
+
+    def _compute_or_load_oracle_ra(self) -> np.ndarray:
+        path = self._oracle_ra_cache_path()
+        if path.exists():
+            tau = np.load(path)
+            if tau.shape == (self.X_river.shape[0],):
+                logger.info("RealWorldGAIN: loaded cached RA pseudo-oracle %s", path)
+                return tau
+            logger.info("RealWorldGAIN: RA oracle cache shape mismatch, recomputing")
+
+        logger.info(
+            "RealWorldGAIN: fitting RA pseudo-oracle (T-learner 5-fold CV, %d averaged runs)",
+            len(self.oracle_seeds),
+        )
+        tau = _pseudo_oracle_ra_tau(
+            self.X_river, self.A_river, self.Y_river_full, self.oracle_seeds,
+        )
+        np.save(path, tau)
+        logger.info(
+            "RealWorldGAIN: cached RA pseudo-oracle to %s  (mean=%.4f std=%.4f)",
+            path, float(tau.mean()), float(tau.std()),
+        )
+        return tau
+
+    # ------------------------------------------------------------
     def resample(self, seed: int) -> "RealWorldGAIN":
         """Redraw §3.3 rejection sampling and §3.4 train/test split."""
         self.seed = int(seed)
@@ -302,6 +385,7 @@ class RealWorldGAIN(BaseDataset):
         A_k = self.A_river[keep]
         S_k = self.S_river[keep]
         tau_k = self.tau_star_river[keep]
+        tau_ra_k = self.tau_star_ra_river[keep]
         pi_post = (m[keep] * 0.81) / (m[keep] * 0.81 + (1 - m[keep]) * (1 - 0.81))
 
         logger.info(
@@ -321,6 +405,8 @@ class RealWorldGAIN(BaseDataset):
         self.X_test, self.A_test, self.S_test = X_k[te_idx], A_k[te_idx], S_k[te_idx]
         self.tau_star_train = tau_k[tr_idx]
         self.tau_star_test = tau_k[te_idx]
+        self.tau_star_ra_train = tau_ra_k[tr_idx]
+        self.tau_star_ra_test = tau_ra_k[te_idx]
 
         logger.info(
             "RealWorldGAIN: Riverside train n=%d, test n=%d",

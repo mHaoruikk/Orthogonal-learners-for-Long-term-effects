@@ -4,9 +4,9 @@ dim_x: 10
 n: 10000
 sigma_s: 0.2
 sigma_y: 0.5
-gamma: 5.0       # γ_π: treatment overlap difficulty (bad)
-gamma_rho: 0.0   # γ_ρ: long-term outcome overlap difficulty (0 = balanced)
-eta_pi: 0.01     # lower/upper bound for π: π ∈ (η_π, 1−η_π)
-eta_rho: 0.001   # lower bound for ρ: ρ ∈ (η_ρ, 1)
+gamma: 5.0      
+gamma_rho: 0.0   
+eta_pi: 0.01    
+eta_rho: 0.001   
 seed: 0
 use_old_dgp: true

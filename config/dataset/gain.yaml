@@ -2,36 +2,26 @@ name: real-world-gain
 type: real_world_gain
 data_path: data/GAIN/quarterly.csv
 
-# --- Short-term surrogate window (inclusive quarters post-RA) ---
-# S = (tcedd_{k}, aid_{k}, 1{tcedd_k > 0}) for k in [s_quarter_start, s_quarter_end].
-# Default [1, 6] matches docs/GAIN_experiment_plan.md §2.6.
 s_quarter_start: 1
 s_quarter_end: 6
 
 # --- Long-term outcome Y ---
-# mean      -> Y = mean(tcedd13..tcedd36)   (Athey-style long-run)
-# q36       -> Y = tcedd36                  (terminal quarter)
-# last_year -> Y = mean(tcedd33..tcedd36)   (final-year mean)
+# mean      -> Y = mean(tcedd13..tcedd36)
+# q36       -> Y = tcedd36                
+# last_year -> Y = mean(tcedd33..tcedd36)  
 y_kind: mean
 
-# Multiplicative scale on Y (pseudo-oracle inherits the same units).
-# 0.001 expresses raw-dollar earnings in $k per quarter -> PEHE/variance on O(1).
+
 y_scale: 0.001
 
-# --- §3.3 rejection sampling for low treatment overlap ---
-# gamma_pi sweeps {0, 1, 2, 4} in Experiment B; 2 is the moderate default.
+
 gamma_pi: 2.0
 beta_earn: 0.7
 beta_age: 0.3
 trim_eps: 0.01
 
-# --- §3.4 Riverside train/test split ---
 train_frac: 0.8
 
-# --- §4 pseudo-oracle averaging ---
-# Each seed drives a full 5-fold cross-fitted DR-learner on the unfiltered
-# Riverside sample; final-stage tau-hats are averaged across these runs.
-# Changing this list invalidates the disk cache.
 oracle_seeds: [0, 1, 2, 3, 4]
 
 dim_x: 40

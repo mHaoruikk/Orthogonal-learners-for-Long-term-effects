@@ -4,8 +4,8 @@ dim_x: 10
 n: 10000
 sigma_s: 0.2
 sigma_y: 0.5
-gamma: 0.0       # γ_π: treatment overlap difficulty (0 = balanced)
-gamma_rho: 4.0   # γ_ρ: long-term outcome overlap difficulty
+gamma: 0.0       # treatment overlap difficulty (0 = balanced)
+gamma_rho: 4.0   #: long-term outcome overlap difficulty
 eta_pi: 0.01
 eta_rho: 0.001
 seed: 0

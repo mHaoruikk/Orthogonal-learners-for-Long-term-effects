@@ -292,11 +292,19 @@ class RealWorldGAIN(BaseDataset):
         self.x_earn_river = _zscore(earn)
         self.x_age_river = _zscore(age)
 
-        # §4 pseudo-oracle (cached). Two flavours: DR (default) and RA. Both
-        # are functions of (X, A, Y) only — surrogate-agnostic — so they share
-        # cache lifetimes with `y_kind`/`y_scale`/`dim_x`.
-        self.tau_star_river = self._compute_or_load_oracle()
-        self.tau_star_ra_river = self._compute_or_load_oracle_ra()
+        # §4 pseudo-oracle (cached). The canonical `tau_star_river` is the
+        # simple mean of the DR and RA oracle predictions. Both individual
+        # oracles are functions of (X, A, Y) only — surrogate-agnostic — so
+        # they share cache lifetimes with `y_kind`/`y_scale`/`dim_x`.
+        tau_dr = self._compute_or_load_oracle()
+        tau_ra = self._compute_or_load_oracle_ra()
+        self.tau_star_river = 0.5 * (tau_dr + tau_ra)
+        self.tau_star_ra_river = tau_ra
+        logger.info(
+            "RealWorldGAIN: ensemble pseudo-oracle = mean(DR, RA)  "
+            "(mean=%.4f std=%.4f)",
+            float(self.tau_star_river.mean()), float(self.tau_star_river.std()),
+        )
 
         # §3.3 + §3.4
         self.resample(self.seed)
@@ -403,6 +411,8 @@ class RealWorldGAIN(BaseDataset):
 
         self.X_train, self.A_train, self.S_train = X_k[tr_idx], A_k[tr_idx], S_k[tr_idx]
         self.X_test, self.A_test, self.S_test = X_k[te_idx], A_k[te_idx], S_k[te_idx]
+        # `tau_star_*` is the canonical average pseudo-oracle (DR+RA)/2; RA is
+        # kept separately for diagnostic comparisons.
         self.tau_star_train = tau_k[tr_idx]
         self.tau_star_test = tau_k[te_idx]
         self.tau_star_ra_train = tau_ra_k[tr_idx]

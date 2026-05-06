@@ -12,9 +12,7 @@ notebooks/_build_*.py
 /notebooks/*.pdf
 .vscode/
 scripts/bump_pehe.py
-docs/.
-docs/lto-learners-overleaf/*
-docs/Description-IST3.pdf
+docs/
 
 CLAUDE.md
 
